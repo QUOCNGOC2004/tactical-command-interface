@@ -28,15 +28,17 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       return NextResponse.json({ error: "Hệ thống nước đang bảo trì hoặc có lỗi" }, { status: 400 })
     }
 
-    // Kiểm tra giới hạn tiêu thụ hàng ngày
-    if (waterSystem.daily_consumption + amount > waterSystem.max_daily_consumption) {
-      return NextResponse.json({ 
-        error: `Vượt quá giới hạn tiêu thụ hàng ngày (${waterSystem.max_daily_consumption}ml)` 
-      }, { status: 400 })
+    // Nếu mức nước đã hết
+    if (waterSystem.water_level <= 0) {
+      return NextResponse.json({ error: "Hết nước trong bình" }, { status: 400 })
     }
-
-    // Tính toán mức nước mới - đặt về 100% khi phát nước
-    const newWaterLevel = 100 // Đặt mức nước về 100%
+    // Nếu mức nước không đủ để phát
+    const maxCapacity = 2000 // ml
+    const usedPercent = (amount / maxCapacity) * 100
+    if (waterSystem.water_level < usedPercent) {
+      return NextResponse.json({ error: "Hết nước trong bình" }, { status: 400 })
+    }
+    const newWaterLevel = Math.max(0, waterSystem.water_level - usedPercent)
     const newDailyConsumption = waterSystem.daily_consumption + amount
 
     // Cập nhật hệ thống nước
@@ -70,15 +72,20 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       console.error("Error creating water dispenser log:", logError)
     }
 
-    // Sau 3 giây, tự động đặt về trạng thái active
-    setTimeout(async () => {
+    const waterSystemId = params.id // Lưu lại id để dùng trong setTimeout
+    // Đưa logic cập nhật trạng thái về active vào một hàm riêng
+    const setActiveStatus = async (id: string) => {
       await supabase
         .from("water_systems")
         .update({
           status: "active",
           pump_status: "ready"
         })
-        .eq("id", params.id)
+        .eq("id", id)
+    }
+    // Sau 3 giây, tự động đặt về trạng thái active
+    setTimeout(() => {
+      setActiveStatus(waterSystemId)
     }, 3000)
 
     return NextResponse.json({
@@ -89,6 +96,6 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     })
   } catch (error) {
     console.error("Error dispensing water:", error)
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 })
+    return NextResponse.json({ error: "Đã xảy ra lỗi khi phát nước" }, { status: 500 })
   }
 }

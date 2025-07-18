@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Droplets, AlertTriangle, CheckCircle, Clock, Zap } from "lucide-react"
+import { useToast } from "@/components/ui/use-toast"
 
 interface WaterSystem {
   id: string
@@ -60,6 +61,8 @@ export default function WaterSystemPage() {
   const [systemStats, setSystemStats] = useState<SystemStats | null>(null)
   const [loading, setLoading] = useState(true)
   const [dispensingSystems, setDispensingSystems] = useState<Set<string>>(new Set())
+  const { toast } = useToast()
+  const [waterAlert, setWaterAlert] = useState<string | null>(null)
 
   useEffect(() => {
     fetchWaterSystems()
@@ -127,6 +130,7 @@ export default function WaterSystemPage() {
 
       if (response.ok) {
         const result = await response.json()
+        setWaterAlert(null) // Xóa cảnh báo khi phát nước thành công
         console.log("Dispense result:", result.note)
         
         // Refresh data after successful dispense
@@ -140,16 +144,48 @@ export default function WaterSystemPage() {
         }, 3500)
       } else {
         const errorData = await response.json()
-        console.error("Dispense error:", errorData.error)
+        // Lấy thông tin hệ thống nước để cảnh báo cụ thể
+        const system = waterSystems.find(ws => ws.id === systemId)
+        let location = ""
+        if (system) {
+          location = ` (Phòng ${system.room_number}${system.bed_number ? ` - Giường ${system.bed_number}` : ""}${system.patients?.name ? ` - ${system.patients.name}` : ""})`
+        }
+        if (errorData.error === "Hết nước trong bình") {
+          setWaterAlert(`Hết nước trong bình${location}! Vui lòng bơm nước.`)
+        } else if (errorData.error === "Hệ thống nước không tồn tại") {
+          setWaterAlert(`Không tìm thấy hệ thống nước${location}! Vui lòng kiểm tra lại hoặc liên hệ quản trị viên.`)
+        } else {
+          setWaterAlert((errorData.error || "Lỗi không xác định khi phát nước.") + location)
+        }
       }
     } catch (error) {
-      console.error("Error dispensing water:", error)
+      setWaterAlert("Lỗi không xác định khi phát nước.")
     } finally {
       setDispensingSystems(prev => {
         const newSet = new Set(prev)
         newSet.delete(systemId)
         return newSet
       })
+    }
+  }
+
+  const handleRefillWater = async (systemId: string) => {
+    try {
+      const response = await fetch(`/api/water-systems/${systemId}/refill`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({})
+      })
+      if (response.ok) {
+        setWaterAlert(null) // Xóa cảnh báo khi bơm nước thành công
+        await fetchWaterSystems()
+        await fetchSystemStats()
+      } else {
+        const errorData = await response.json()
+        setWaterAlert("Lỗi bơm nước: " + errorData.error)
+      }
+    } catch (error) {
+      setWaterAlert("Lỗi bơm nước")
     }
   }
 
@@ -336,7 +372,7 @@ export default function WaterSystemPage() {
               <div>
                 <p className="text-xs text-neutral-400 tracking-wider">CẢNH BÁO NƯỚC</p>
                 <p className="text-2xl font-bold text-red-500 font-mono">
-                  {systemStats?.lowWaterSystems || 0}
+                  {waterSystems.filter(ws => ws.water_level < 40).length}
                 </p>
               </div>
               <AlertTriangle className="w-8 h-8 text-red-500" />
@@ -425,10 +461,6 @@ export default function WaterSystemPage() {
                   <div className="text-white font-mono">{formatTime(system.last_dispense)}</div>
                 </div>
                 <div>
-                  <div className="text-neutral-400 mb-1">Lịch tiếp theo</div>
-                  <div className="text-white font-mono">{formatTime(system.next_schedule)}</div>
-                </div>
-                <div>
                   <div className="text-neutral-400 mb-1">Tiêu thụ hôm nay</div>
                   <div className="text-white font-mono">{system.daily_consumption}ml</div>
                 </div>
@@ -455,9 +487,10 @@ export default function WaterSystemPage() {
                   size="sm"
                   variant="outline"
                   className="border-neutral-700 text-neutral-400 hover:bg-neutral-800 hover:text-neutral-300 bg-transparent text-xs"
+                  onClick={() => handleRefillWater(system.id)}
                 >
                   <Zap className="w-3 h-3 mr-1" />
-                  Test
+                  Bơm
                 </Button>
               </div>
             </CardContent>
@@ -465,64 +498,26 @@ export default function WaterSystemPage() {
         ))}
       </div>
 
-      {/* Water Consumption Chart */}
-      <Card className="bg-neutral-900 border-neutral-700">
-        <CardHeader>
-          <CardTitle className="text-sm font-medium text-neutral-300 tracking-wider">
-            BIỂU ĐỒ TIÊU THỤ NƯỚC THEO GIỜ
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="h-48 relative">
-            {/* Chart Grid */}
-            <div className="absolute inset-0 grid grid-cols-12 grid-rows-6 opacity-20">
-              {Array.from({ length: 72 }).map((_, i) => (
-                <div key={i} className="border border-neutral-700"></div>
-              ))}
-            </div>
-
-            {/* Chart Bars */}
-            <div className="absolute inset-0 flex items-end justify-around px-4">
-              {[
-                { hour: "06:00", consumption: 180, color: "bg-white" },
-                { hour: "08:00", consumption: 220, color: "bg-white" },
-                { hour: "10:00", consumption: 150, color: "bg-white" },
-                { hour: "12:00", consumption: 200, color: "bg-white" },
-                { hour: "14:00", consumption: 190, color: "bg-white" },
-                { hour: "16:00", consumption: 250, color: "bg-orange-500" },
-                { hour: "18:00", consumption: 210, color: "bg-white" },
-                { hour: "20:00", consumption: 180, color: "bg-white" },
-              ].map((data, index) => (
-                <div key={index} className="flex flex-col items-center">
-                  <div
-                    className={`w-8 ${data.color} transition-all duration-300`}
-                    style={{ height: `${(data.consumption / 300) * 160}px` }}
-                  ></div>
-                  <div className="text-xs text-neutral-400 mt-2 font-mono">{data.hour}</div>
-                  <div className="text-xs text-neutral-500 font-mono">{data.consumption}ml</div>
-                </div>
-              ))}
-            </div>
-
-            {/* Y-axis labels */}
-            <div className="absolute left-0 top-0 h-full flex flex-col justify-between text-xs text-neutral-500 -ml-8 font-mono">
-              <span>300ml</span>
-              <span>200ml</span>
-              <span>100ml</span>
-              <span>0ml</span>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
       {/* System Alerts */}
       <Card className="bg-neutral-900 border-neutral-700">
         <CardHeader>
           <CardTitle className="text-sm font-medium text-neutral-300 tracking-wider">CẢNH BÁO HỆ THỐNG</CardTitle>
         </CardHeader>
         <CardContent>
+          {/* Hiển thị cảnh báo nước khi phát nước lỗi */}
+          {waterAlert && (
+            <div className="mb-3 text-xs text-red-500 font-bold bg-red-500/10 p-2 rounded">
+              {waterAlert}
+            </div>
+          )}
+          {/* Hiển thị số lượng hệ thống nước cảnh báo mức nước thấp */}
+          {systemStats && (
+            <div className="mb-3 text-xs text-orange-400">
+              Có {waterSystems.filter(ws => ws.water_level < 40).length} hệ thống nước mức nước thấp (&lt;40%)
+            </div>
+          )}
           <div className="space-y-3">
-            {systemStats?.lowestWaterSystem && systemStats.lowestWaterSystem.water_level < 20 && (
+            {systemStats?.lowestWaterSystem && systemStats.lowestWaterSystem.water_level < 40 && (
               <div className="text-xs border-l-2 border-orange-500 pl-3 hover:bg-neutral-800 p-2 rounded transition-colors">
                 <div className="flex items-center justify-between mb-1">
                   <div className="text-neutral-500 font-mono">{new Date().toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}</div>
