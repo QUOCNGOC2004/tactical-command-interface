@@ -11,6 +11,7 @@ export default function EmergencyPage() {
   const [loading, setLoading] = useState(true)
   const [callingPatientId, setCallingPatientId] = useState<string | null>(null)
   const [callingType, setCallingType] = useState<null | "medical" | "family">(null)
+  const [activeAlerts, setActiveAlerts] = useState<{room: string, bed: string, patient: string}[]>([])
 
   useEffect(() => {
     fetchPatients()
@@ -33,6 +34,20 @@ export default function EmergencyPage() {
   const handlePatientEmergencyCall = (patientId: string, type: "medical" | "family") => {
     setCallingPatientId(patientId)
     setCallingType(type)
+    // Nếu là gọi khẩn cấp (nút app), thêm vào danh sách cảnh báo
+    if (type === "medical") {
+      const patient = (patients as any[]).find((p) => p.id === patientId)
+      if (patient) {
+        setActiveAlerts((prev) => [
+          ...prev,
+          { room: patient.room_number, bed: patient.bed_number, patient: patient.name }
+        ])
+        // Tự động ẩn sau 5 giây
+        setTimeout(() => {
+          setActiveAlerts((prev) => prev.filter(a => !(a.room === patient.room_number && a.bed === patient.bed_number)))
+        }, 5000)
+      }
+    }
     // Simulate call
     setTimeout(() => {
       setCallingPatientId(null)
@@ -78,6 +93,22 @@ export default function EmergencyPage() {
 
   return (
     <div className="p-6 space-y-6">
+      {/* Ô cảnh báo khẩn cấp */}
+      {activeAlerts.length > 0 && (
+        <div className="mb-4 p-4 bg-red-500/20 border-l-4 border-red-500 rounded text-red-700 font-bold text-sm animate-pulse">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="w-5 h-5" />
+            <span>CẢNH BÁO KHẨN CẤP:</span>
+            <span>
+              {activeAlerts.map((a, idx) => (
+                <span key={idx} className="mr-3">
+                  Phòng {a.room}{a.bed ? ` - Giường ${a.bed}` : ""} ({a.patient})
+                </span>
+              ))}
+            </span>
+          </div>
+        </div>
+      )}
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
@@ -120,98 +151,27 @@ export default function EmergencyPage() {
                   <Phone className="w-3 h-3 mr-1" />
                   {callingPatientId === patient.id && callingType === "medical" ? "Đang gọi..." : "Gọi khẩn cấp"}
                 </Button>
-                <Button
-                  size="sm"
-                  className="flex-1 bg-orange-500 hover:bg-orange-600 text-white text-xs"
-                  disabled={callingPatientId === patient.id && callingType === "family"}
-                  onClick={() => handlePatientEmergencyCall(patient.id, "family")}
-                >
-                  <Users className="w-3 h-3 mr-1" />
-                  {callingPatientId === patient.id && callingType === "family" ? "Đang gọi..." : "Gọi người nhà"}
-                </Button>
+                <div className="flex-1 flex flex-col items-center">
+                  <Button
+                    size="sm"
+                    className="w-full bg-orange-500 hover:bg-orange-600 text-white text-xs"
+                    disabled={callingPatientId === patient.id && callingType === "family"}
+                    onClick={() => handlePatientEmergencyCall(patient.id, "family")}
+                  >
+                    <Users className="w-3 h-3 mr-1" />
+                    {callingPatientId === patient.id && callingType === "family" ? "Đang gọi..." : "Gọi người nhà"}
+                  </Button>
+                  {patient.emergency_contact && (
+                    <span className="mt-1 text-xs text-orange-400 font-mono text-center block w-full truncate">
+                      {patient.emergency_contact}
+                    </span>
+                  )}
+                </div>
               </div>
             </CardContent>
           </Card>
         ))}
       </div>
-
-      {/* Emergency Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="bg-neutral-900 border-neutral-700">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-neutral-400 tracking-wider">CUỘC GỌI HÔM NAY</p>
-                <p className="text-2xl font-bold text-white font-mono">7</p>
-              </div>
-              <Phone className="w-8 h-8 text-white" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-neutral-900 border-neutral-700">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-neutral-400 tracking-wider">KHẨN CẤP Y TẾ</p>
-                <p className="text-2xl font-bold text-red-500 font-mono">3</p>
-              </div>
-              <Heart className="w-8 h-8 text-red-500" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-neutral-900 border-neutral-700">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-neutral-400 tracking-wider">GỌI NGƯỜI NHÀ</p>
-                <p className="text-2xl font-bold text-orange-500 font-mono">4</p>
-              </div>
-              <Users className="w-8 h-8 text-orange-500" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-neutral-900 border-neutral-700">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-neutral-400 tracking-wider">THỜI GIAN PHẢN HỒI</p>
-                <p className="text-2xl font-bold text-white font-mono">1.8m</p>
-              </div>
-              <Clock className="w-8 h-8 text-white" />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Web Emergency Slider for Family */}
-      <Card className="bg-neutral-900 border-neutral-700">
-        <CardHeader>
-          <CardTitle className="text-sm font-medium text-neutral-300 tracking-wider">
-            THANH TRƯỢT KHẨN CẤP - DÀNH CHO NGƯỜI NHÀ
-          </CardTitle>
-          <p className="text-xs text-neutral-400">Kéo thanh trượt để gọi khẩn cấp từ web interface</p>
-        </CardHeader>
-        <CardContent>
-          <div className="bg-neutral-800 rounded-lg p-6">
-            <div className="relative">
-              <div className="w-full h-16 bg-gradient-to-r from-neutral-700 to-red-500 rounded-full relative overflow-hidden">
-                <div className="absolute inset-0 flex items-center justify-center text-white font-bold">
-                  TRƯỢT ĐỂ GỌI KHẨN CẤP
-                </div>
-                <div className="absolute left-2 top-2 w-12 h-12 bg-white rounded-full flex items-center justify-center cursor-pointer hover:bg-neutral-200 transition-colors">
-                  <Zap className="w-6 h-6 text-red-500" />
-                </div>
-              </div>
-            </div>
-            <div className="mt-4 text-xs text-neutral-400 text-center">
-              Chức năng này cho phép người nhà gọi khẩn cấp từ xa thông qua web interface
-            </div>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   )
 }
