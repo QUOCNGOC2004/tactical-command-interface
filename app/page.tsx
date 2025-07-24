@@ -23,9 +23,11 @@ export default function DashboardOverview() {
     systemUptime: "168:45:12",
   })
   const [loading, setLoading] = useState(true)
+  const [notifications, setNotifications] = useState<any[]>([])
 
   useEffect(() => {
     fetchDashboardStats()
+    fetchNotifications()
   }, [])
 
   const fetchDashboardStats = async () => {
@@ -34,9 +36,9 @@ export default function DashboardOverview() {
       const patientsResponse = await fetch("/api/patients")
       const patients = patientsResponse.ok ? await patientsResponse.json() : []
 
-      // Fetch medications count
-      const medicationsResponse = await fetch("/api/medications")
-      const medications = medicationsResponse.ok ? await medicationsResponse.json() : []
+      // Fetch cabinets count
+      const cabinetsResponse = await fetch("/api/medicine-cabinets")
+      const cabinets = cabinetsResponse.ok ? await cabinetsResponse.json() : []
 
       // Fetch schedules count
       const schedulesResponse = await fetch("/api/medication-schedules")
@@ -44,9 +46,9 @@ export default function DashboardOverview() {
 
       setStats({
         totalPatients: patients.length,
-        activeCabinets: patients.filter((p: any) => p.medicine_cabinets?.length > 0).length,
+        activeCabinets: cabinets.filter((c: any) => c.status !== "error").length,
         pendingMedications: schedules.filter((s: any) => s.status === "pending").length,
-        emergencyAlerts: 2, // Mock data
+        emergencyAlerts: cabinets.filter((c: any) => c.status === "error").length,
         systemUptime: "168:45:12",
       })
     } catch (error) {
@@ -54,6 +56,28 @@ export default function DashboardOverview() {
     } finally {
       setLoading(false)
     }
+  }
+
+  const fetchNotifications = async () => {
+    try {
+      // Ưu tiên lấy từ API nếu có
+      const res = await fetch("/api/notifications")
+      if (res.ok) {
+        const data = await res.json()
+        setNotifications(data.slice(0, 10))
+        return
+      }
+    } catch {}
+    // Nếu không có API, thử lấy từ localStorage
+    try {
+      const local = localStorage.getItem("notifications")
+      if (local) {
+        setNotifications(JSON.parse(local).slice(0, 10))
+        return
+      }
+    } catch {}
+    // Nếu không có, để trống
+    setNotifications([])
   }
 
   if (loading) {
@@ -179,55 +203,38 @@ export default function DashboardOverview() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {[
-                {
-                  time: "16:45",
-                  action: "Phát thuốc tự động",
-                  patient: "Nguyễn Văn A",
-                  status: "success",
-                },
-                {
-                  time: "16:30",
-                  action: "Cảnh báo tồn kho thấp",
-                  patient: "Paracetamol",
-                  status: "warning",
-                },
-                {
-                  time: "16:15",
-                  action: "Đồng bộ dữ liệu sức khỏe",
-                  patient: "Trần Thị B",
-                  status: "success",
-                },
-                {
-                  time: "16:00",
-                  action: "Gọi khẩn cấp",
-                  patient: "Lê Văn C",
-                  status: "alert",
-                },
-              ].map((activity, index) => (
-                <div key={index} className="flex items-center gap-3 p-3 bg-neutral-800 rounded-lg">
-                  <div className="text-xs text-neutral-400 font-mono min-w-[40px]">{activity.time}</div>
-                  <div className="flex-1">
-                    <div className="text-sm text-white">{activity.action}</div>
-                    <div className="text-xs text-neutral-400">{activity.patient}</div>
-                  </div>
-                  <Badge
-                    className={
-                      activity.status === "success"
-                        ? "bg-white/20 text-white"
-                        : activity.status === "warning"
+              {notifications.length === 0 ? (
+                <div className="text-neutral-500 text-sm">Chưa có hoạt động nào gần đây.</div>
+              ) : (
+                notifications.map((activity, index) => (
+                  <div key={index} className="flex items-center gap-3 p-3 bg-neutral-800 rounded-lg">
+                    <div className="text-xs text-neutral-400 font-mono min-w-[60px]">
+                      {activity.time || activity.created_at || "--:--"}
+                    </div>
+                    <div className="flex-1">
+                      <div className="text-sm text-white">{activity.action || activity.title || activity.message}</div>
+                      {activity.patient && <div className="text-xs text-neutral-400">{activity.patient}</div>}
+                    </div>
+                    <Badge
+                      className={
+                        activity.status === "success"
+                          ? "bg-white/20 text-white"
+                          : activity.status === "warning"
                           ? "bg-orange-500/20 text-orange-500"
                           : "bg-red-500/20 text-red-500"
-                    }
-                  >
-                    {activity.status === "success"
-                      ? "THÀNH CÔNG"
-                      : activity.status === "warning"
+                      }
+                    >
+                      {activity.status === "success"
+                        ? "THÀNH CÔNG"
+                        : activity.status === "warning"
                         ? "CẢNH BÁO"
-                        : "KHẨN CẤP"}
-                  </Badge>
-                </div>
-              ))}
+                        : activity.status === "alert"
+                        ? "KHẨN CẤP"
+                        : "THÔNG BÁO"}
+                    </Badge>
+                  </div>
+                ))
+              )}
             </div>
           </CardContent>
         </Card>

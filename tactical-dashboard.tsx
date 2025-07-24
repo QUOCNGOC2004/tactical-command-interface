@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { Button } from "@/components/ui/button"
@@ -77,6 +77,29 @@ const navigation = [
 export default function TacticalDashboard({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const pathname = usePathname()
+  const [patientCount, setPatientCount] = useState<number>(0)
+  const [cabinetCount, setCabinetCount] = useState<number>(0)
+  const [activeCabinetCount, setActiveCabinetCount] = useState<number>(0)
+  const [errorCabinetCount, setErrorCabinetCount] = useState<number>(0)
+  const [lastUpdate, setLastUpdate] = useState<string>("")
+
+  useEffect(() => {
+    fetchSidebarStats()
+  }, [])
+
+  const fetchSidebarStats = async () => {
+    try {
+      const pRes = await fetch("/api/patients")
+      const cRes = await fetch("/api/medicine-cabinets")
+      const patients = pRes.ok ? await pRes.json() : []
+      const cabinets = cRes.ok ? await cRes.json() : []
+      setPatientCount(patients.length)
+      setCabinetCount(cabinets.length)
+      setActiveCabinetCount(cabinets.filter((c: any) => c.status !== "error").length)
+      setErrorCabinetCount(cabinets.filter((c: any) => c.status === "error").length)
+      setLastUpdate(new Date().toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit", second: "2-digit" }))
+    } catch {}
+  }
 
   return (
     <div className="flex h-screen bg-black text-white">
@@ -157,11 +180,11 @@ export default function TacticalDashboard({ children }: { children: React.ReactN
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   <div className="flex justify-between">
                     <span className="text-neutral-500">Tủ thuốc</span>
-                    <span className="text-white font-mono">12/15</span>
+                    <span className="text-white font-mono">{activeCabinetCount}/{cabinetCount}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-neutral-500">Bệnh nhân</span>
-                    <span className="text-white font-mono">24</span>
+                    <span className="text-white font-mono">{patientCount}</span>
                   </div>
                 </div>
               </CardContent>
@@ -186,7 +209,7 @@ export default function TacticalDashboard({ children }: { children: React.ReactN
             <div className="flex items-center gap-2">
               <Activity className="w-5 h-5 text-orange-500" />
               <span className="text-sm text-neutral-400">
-                Cập nhật: <span className="text-white font-mono">17:45:32</span>
+                Cập nhật: <span className="text-white font-mono">{lastUpdate}</span>
               </span>
             </div>
           </div>
@@ -195,11 +218,11 @@ export default function TacticalDashboard({ children }: { children: React.ReactN
             <div className="hidden sm:flex items-center gap-2 text-xs">
               <div className="flex items-center gap-1">
                 <div className="w-2 h-2 bg-white rounded-full" />
-                <span className="text-neutral-400">11 Tủ thuốc hoạt động</span>
+                <span className="text-neutral-400">{activeCabinetCount} Tủ thuốc hoạt động</span>
               </div>
               <div className="flex items-center gap-1">
                 <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse" />
-                <span className="text-neutral-400">2 Cảnh báo</span>
+                <span className="text-neutral-400">{errorCabinetCount} Cảnh báo</span>
               </div>
             </div>
           </div>
