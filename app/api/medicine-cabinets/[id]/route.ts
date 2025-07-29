@@ -14,7 +14,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
         room_number,
         bed_number,
         status,
-        patients(id, name, patient_code)
+        patients(id, name, patient_code, room_number, bed_number)
       `)
       .eq("id", params.id)
       .single()
@@ -92,6 +92,17 @@ export async function GET(request: Request, { params }: { params: { id: string }
 
     const result = {
       ...cabinet,
+      room_number: cabinet.patients ? cabinet.patients.room_number : cabinet.room_number,
+      bed_number: cabinet.patients ? cabinet.patients.bed_number : cabinet.bed_number,
+      patient: cabinet.patients
+        ? {
+            id: cabinet.patients.id,
+            name: cabinet.patients.name,
+            patient_code: cabinet.patients.patient_code,
+            room_number: cabinet.patients.room_number,
+            bed_number: cabinet.patients.bed_number,
+          }
+        : null,
       medications,
       todaySchedules: transformedSchedules,
     }
@@ -99,6 +110,24 @@ export async function GET(request: Request, { params }: { params: { id: string }
     return NextResponse.json(result)
   } catch (error) {
     console.error("Error fetching cabinet detail:", error)
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 })
+  }
+}
+
+export async function PATCH(request: Request, { params }: { params: { id: string } }) {
+  const supabase = createServerClient()
+  try {
+    const body = await request.json()
+    const { patient_id } = body
+    // Cho phép gán hoặc bỏ gán (nếu patient_id là null)
+    const { error } = await supabase
+      .from("medicine_cabinets")
+      .update({ patient_id: patient_id || null })
+      .eq("id", params.id)
+    if (error) throw error
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    console.error("Error updating cabinet patient:", error)
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 })
   }
 }

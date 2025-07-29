@@ -83,16 +83,6 @@ export async function POST(request: Request) {
 
     if (patientError) throw patientError
 
-    // Tạo tủ thuốc cho bệnh nhân
-    const cabinet_code = `CAB-${room_number}${bed_number}`
-    await supabase.from("medicine_cabinets").insert({
-      cabinet_code,
-      room_number,
-      bed_number,
-      patient_id: patient.id,
-      status: "locked",
-    })
-
     // Tạo hệ thống nước cho bệnh nhân mới
     const { count: existingWaterSystems } = await supabase
       .from("water_systems")

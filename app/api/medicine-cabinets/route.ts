@@ -7,21 +7,21 @@ export async function GET() {
   try {
     const { data: cabinets, error } = await supabase
       .from("medicine_cabinets")
-      .select(
-        `
+      .select(`
+        id,
+        cabinet_code,
+        room_number,
+        bed_number,
+        status,
+        patient_id,
+        patients (
           id,
-          cabinet_code,
+          name,
+          patient_code,
           room_number,
-          bed_number,
-          status,
-          patient_id,
-          patients (
-            id,
-            name,
-            patient_code
-          )
-        `,
-      )
+          bed_number
+        )
+      `)
       .order("room_number", { ascending: true })
       .order("bed_number", { ascending: true })
 
@@ -34,14 +34,16 @@ export async function GET() {
     const transformedCabinets = (cabinets || []).map((cabinet) => ({
       id: cabinet.id,
       cabinet_code: cabinet.cabinet_code,
-      room_number: cabinet.room_number,
-      bed_number: cabinet.bed_number,
+      room_number: cabinet.patients ? cabinet.patients.room_number : cabinet.room_number,
+      bed_number: cabinet.patients ? cabinet.patients.bed_number : cabinet.bed_number,
       status: cabinet.status || "locked",
       patient: cabinet.patients
         ? {
             id: cabinet.patients.id,
             name: cabinet.patients.name,
             patient_code: cabinet.patients.patient_code,
+            room_number: cabinet.patients.room_number,
+            bed_number: cabinet.patients.bed_number,
           }
         : null,
     }))

@@ -36,7 +36,7 @@ CREATE TABLE IF NOT EXISTS medicine_cabinets (
     cabinet_code VARCHAR(20) UNIQUE NOT NULL,
     room_number VARCHAR(10) NOT NULL,
     bed_number VARCHAR(10),
-    patient_id UUID REFERENCES patients(id) ON DELETE CASCADE,
+    patient_id UUID REFERENCES patients(id) ON DELETE SET NULL,
     status VARCHAR(20) DEFAULT 'locked' CHECK (status IN ('locked', 'open', 'error', 'maintenance')),
     last_opened TIMESTAMP WITH TIME ZONE,
     rfid_card_id VARCHAR(50),
@@ -243,9 +243,13 @@ INSERT INTO medications (name, dosage, description, stock_quantity, unit, min_st
 ('Omeprazole', '20mg', 'Thuốc điều trị dạ dày', 90, 'viên', 15),
 ('Vitamin D3', '1000IU', 'Bổ sung vitamin D', 75, 'viên', 10);
 
-INSERT INTO medicine_cabinets (cabinet_code, room_number, patient_id, status, rfid_card_id) 
-SELECT 'CAB-' || LPAD(ROW_NUMBER() OVER()::text, 3, '0'), room_number, id, 'locked', 'RFID-' || id::text
-FROM patients;
+-- XÓA đoạn tự động sinh tủ thuốc theo bệnh nhân (dòng 246-248)
+-- THÊM đoạn tạo 3 tủ thuốc cố định
+INSERT INTO medicine_cabinets (cabinet_code, room_number, status, rfid_card_id)
+VALUES
+  ('CAB-001', '101', 'locked', 'RFID-001'),
+  ('CAB-002', '102', 'locked', 'RFID-002'),
+  ('CAB-003', '103', 'locked', 'RFID-003');
 
 INSERT INTO medication_schedules (patient_id, medication_id, cabinet_id, time_of_day, compartment, dosage_amount) 
 SELECT 
@@ -333,3 +337,151 @@ INSERT INTO water_dispenser_logs (water_system_id, water_level, dispensed_amount
 ((SELECT id FROM water_systems WHERE system_code = 'WS-001'), 90, 200, 'scheduled', NOW() - interval '5 hours'),
 ((SELECT id FROM water_systems WHERE system_code = 'WS-002'), 50, 200, 'scheduled', NOW() - interval '3 hours'),
 ((SELECT id FROM water_systems WHERE system_code = 'WS-003'), 20, 200, 'scheduled', NOW() - interval '4 hours');
+
+-- =============================
+-- TÍCH HỢP FIX WATER SYSTEMS
+-- =============================
+-- Xóa tất cả dữ liệu cũ hệ thống nước
+DELETE FROM water_dispenser_logs;
+DELETE FROM water_schedules;
+DELETE FROM water_systems;
+
+-- Tạo hệ thống nước chỉ cho phòng có bệnh nhân
+INSERT INTO water_systems (
+  system_code,
+  room_number,
+  bed_number,
+  patient_id,
+  status,
+  water_level,
+  pump_status,
+  daily_consumption,
+  max_daily_consumption,
+  created_at,
+  updated_at
+)
+SELECT 
+  'WS-' || LPAD(ROW_NUMBER() OVER()::text, 3, '0') as system_code,
+  p.room_number,
+  p.bed_number,
+  p.id as patient_id,
+  CASE 
+    WHEN p.status = 'critical' THEN 'low_water'
+    WHEN p.status = 'monitoring' THEN 'active'
+    ELSE 'active'
+  END as status,
+  CASE 
+    WHEN p.status = 'critical' THEN 15
+    WHEN p.status = 'monitoring' THEN 65
+    ELSE 85
+  END as water_level,
+  CASE 
+    WHEN p.status = 'critical' THEN 'warning'
+    WHEN p.status = 'monitoring' THEN 'ready'
+    ELSE 'ready'
+  END as pump_status,
+  FLOOR(random() * 800) + 200 as daily_consumption,
+  2000 as max_daily_consumption,
+  NOW() as created_at,
+  NOW() as updated_at
+FROM patients p
+WHERE p.id IS NOT NULL;
+
+-- Tạo lịch phát nước cho mỗi hệ thống
+INSERT INTO water_schedules (
+  water_system_id,
+  patient_id,
+  schedule_time,
+  dispense_amount,
+  is_active,
+  status,
+  created_at,
+  updated_at
+)
+SELECT 
+  ws.id as water_system_id,
+  ws.patient_id,
+  CASE 
+    WHEN random() < 0.33 THEN '07:00:00'::TIME
+    WHEN random() < 0.66 THEN '12:00:00'::TIME
+    ELSE '18:00:00'::TIME
+  END as schedule_time,
+  200 as dispense_amount,
+  true as is_active,
+  'scheduled' as status,
+  NOW() as created_at,
+  NOW() as updated_at
+FROM water_systems ws
+WHERE ws.patient_id IS NOT NULL;
+
+-- Tạo thêm lịch phát nước thứ 2 cho mỗi hệ thống
+INSERT INTO water_schedules (
+  water_system_id,
+  patient_id,
+  schedule_time,
+  dispense_amount,
+  is_active,
+  status,
+  created_at,
+  updated_at
+)
+SELECT 
+  ws.id as water_system_id,
+  ws.patient_id,
+  CASE 
+    WHEN random() < 0.5 THEN '15:00:00'::TIME
+    ELSE '20:00:00'::TIME
+  END as schedule_time,
+  200 as dispense_amount,
+  true as is_active,
+  'scheduled' as status,
+  NOW() as created_at,
+  NOW() as updated_at
+FROM water_systems ws
+WHERE ws.patient_id IS NOT NULL;
+
+-- Tạo log phát nước mẫu
+INSERT INTO water_dispenser_logs (
+  water_system_id,
+  water_level,
+  dispensed_amount,
+  trigger_type,
+  dispensed_at
+)
+SELECT 
+  ws.id as water_system_id,
+  ws.water_level,
+  200 as dispensed_amount,
+  'scheduled' as trigger_type,
+  NOW() - (random() * interval '24 hours') as dispensed_at
+FROM water_systems ws
+WHERE ws.patient_id IS NOT NULL;
+
+-- Hiển thị kết quả
+SELECT 
+  'Water systems created for patients:' as info,
+  COUNT(*) as count
+FROM water_systems;
+
+SELECT 
+  'Water schedules created:' as info,
+  COUNT(*) as count
+FROM water_schedules;
+
+SELECT 
+  'Water logs created:' as info,
+  COUNT(*) as count
+FROM water_dispenser_logs;
+
+-- Hiển thị danh sách hệ thống nước đã tạo
+SELECT 
+  ws.system_code,
+  ws.room_number,
+  ws.bed_number,
+  p.name as patient_name,
+  ws.status,
+  ws.water_level,
+  ws.pump_status
+FROM water_systems ws
+JOIN patients p ON ws.patient_id = p.id
+ORDER BY ws.room_number;

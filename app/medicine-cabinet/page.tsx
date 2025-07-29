@@ -18,6 +18,8 @@ interface MedicineCabinet {
     id: string
     name: string
     patient_code: string
+    room_number?: string
+    bed_number?: string
   } | null
 }
 
@@ -49,6 +51,8 @@ interface CabinetDetail {
     id: string
     name: string
     patient_code: string
+    room_number?: string
+    bed_number?: string
   } | null
   medications: Array<{
     id: string
@@ -90,6 +94,10 @@ export default function MedicineCabinetPage() {
   const [editingMedication, setEditingMedication] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [autoDispenseLoading, setAutoDispenseLoading] = useState(false)
+  const [showAssignPatient, setShowAssignPatient] = useState(false)
+  const [patients, setPatients] = useState<any[]>([])
+  const [assigning, setAssigning] = useState(false)
+  const [selectedPatientId, setSelectedPatientId] = useState("")
 
   // Form states
   const [selectedMedicationId, setSelectedMedicationId] = useState("")
@@ -109,6 +117,10 @@ export default function MedicineCabinetPage() {
 
     return () => clearInterval(interval)
   }, [])
+
+  useEffect(() => {
+    if (showAssignPatient) fetchPatients()
+  }, [showAssignPatient])
 
   const fetchCabinets = async () => {
     try {
@@ -350,7 +362,7 @@ export default function MedicineCabinetPage() {
     switch (status) {
       case "completed":
       case "taken":
-        return "bg-white/20 text-white"
+        return "bg-green-500/20 text-green-500"
       case "dispensing":
         return "bg-orange-500/20 text-orange-500"
       case "pending":
@@ -375,6 +387,56 @@ export default function MedicineCabinetPage() {
         return "Đã lên lịch"
       default:
         return "Không xác định"
+    }
+  }
+
+  const fetchPatients = async () => {
+    const res = await fetch("/api/patients")
+    if (res.ok) {
+      const data = await res.json()
+      setPatients(data)
+    }
+  }
+
+  const handleAssignPatient = async () => {
+    if (!selectedCabinet || !selectedPatientId) return
+    setAssigning(true)
+    try {
+      const res = await fetch(`/api/medicine-cabinets/${selectedCabinet.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ patient_id: selectedPatientId })
+      })
+      if (res.ok) {
+        setShowAssignPatient(false)
+        setSelectedPatientId("")
+        fetchCabinetDetail(selectedCabinet.id)
+        fetchCabinets()
+      } else {
+        alert("Có lỗi khi gán bệnh nhân")
+      }
+    } finally {
+      setAssigning(false)
+    }
+  }
+
+  const handleUnassignPatient = async () => {
+    if (!selectedCabinet) return
+    setAssigning(true)
+    try {
+      const res = await fetch(`/api/medicine-cabinets/${selectedCabinet.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ patient_id: null })
+      })
+      if (res.ok) {
+        fetchCabinetDetail(selectedCabinet.id)
+        fetchCabinets()
+      } else {
+        alert("Có lỗi khi bỏ gán bệnh nhân")
+      }
+    } finally {
+      setAssigning(false)
     }
   }
 
@@ -429,7 +491,7 @@ export default function MedicineCabinetPage() {
 
             <div className="space-y-2 max-h-80 overflow-y-auto">
               {cabinets.length > 0 ? (
-                cabinets.map((cabinet) => (
+                cabinets.map((cabinet, idx) => (
                   <div
                     key={cabinet.id}
                     className="flex items-center justify-between p-2 bg-neutral-800 rounded hover:bg-neutral-700 transition-colors cursor-pointer"
@@ -446,11 +508,14 @@ export default function MedicineCabinetPage() {
                         }`}
                       ></div>
                       <div>
-                        <div className="text-xs text-white font-mono">{cabinet.cabinet_code}</div>
-                        <div className="text-xs text-neutral-500 flex items-center gap-1">
-                          <Bed className="w-3 h-3" />
-                          Phòng {cabinet.room_number} - Giường {cabinet.bed_number}
-                        </div>
+                        <div className="text-xs text-white font-mono">Tủ thuốc {idx + 1}</div>
+                        {/* Chỉ hiện vị trí nếu đã gán bệnh nhân */}
+                        {cabinet.patient && cabinet.patient.room_number && cabinet.patient.bed_number ? (
+                          <div className="text-xs text-neutral-500 flex items-center gap-1">
+                            <Bed className="w-3 h-3" />
+                            Phòng {cabinet.patient.room_number} - Giường {cabinet.patient.bed_number}
+                          </div>
+                        ) : null}
                       </div>
                     </div>
                     <div className="text-right">
@@ -460,7 +525,7 @@ export default function MedicineCabinetPage() {
                           <div className="text-xs text-neutral-500">{cabinet.patient.patient_code}</div>
                         </>
                       ) : (
-                        <div className="text-xs text-neutral-500">Không có bệnh nhân</div>
+                        <div className="text-xs text-neutral-500">Chưa gán bệnh nhân</div>
                       )}
                     </div>
                   </div>
@@ -673,11 +738,14 @@ export default function MedicineCabinetPage() {
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
                 <CardTitle className="text-xl font-bold text-white tracking-wider">
-                  CHI TIẾT TỦ THUỐC {selectedCabinet.cabinet_code}
+                  TỦ THUỐC {cabinets.findIndex(c => c.id === selectedCabinet.id) + 1}
                 </CardTitle>
-                <p className="text-sm text-neutral-400">
-                  Phòng {selectedCabinet.room_number} - Giường {selectedCabinet.bed_number}
-                </p>
+                {/* Chỉ hiện vị trí nếu đã gán bệnh nhân */}
+                {selectedCabinet.patient && selectedCabinet.patient.room_number && selectedCabinet.patient.bed_number ? (
+                  <p className="text-sm text-neutral-400">
+                    Phòng {selectedCabinet.patient.room_number} - Giường {selectedCabinet.patient.bed_number}
+                  </p>
+                ) : null}
               </div>
               <Button
                 variant="ghost"
@@ -703,7 +771,13 @@ export default function MedicineCabinetPage() {
                       <div className="flex justify-between">
                         <span className="text-neutral-400">Vị trí:</span>
                         <span className="text-white">
-                          Phòng {selectedCabinet.room_number} - Giường {selectedCabinet.bed_number}
+                          {selectedCabinet.patient && selectedCabinet.patient.room_number && selectedCabinet.patient.bed_number ? (
+                            <>
+                              {selectedCabinet.patient.name} - Phòng {selectedCabinet.patient.room_number} - Giường {selectedCabinet.patient.bed_number}
+                            </>
+                          ) : (
+                            <span className="text-neutral-500">Chưa có thông tin</span>
+                          )}
                         </span>
                       </div>
                       {selectedCabinet.patient && (
@@ -828,6 +902,16 @@ export default function MedicineCabinetPage() {
               </div>
 
               <div className="flex gap-2 pt-4 border-t border-neutral-700">
+                {!selectedCabinet.patient && (
+                  <Button size="sm" className="bg-orange-500 hover:bg-orange-600 text-white mt-2" onClick={() => setShowAssignPatient(true)}>
+                    Chọn bệnh nhân
+                  </Button>
+                )}
+                {selectedCabinet.patient && (
+                  <Button size="sm" className="bg-neutral-700 hover:bg-neutral-600 text-white mt-2" onClick={handleUnassignPatient} disabled={assigning}>
+                    Bỏ gán bệnh nhân
+                  </Button>
+                )}
                 <Button className="bg-orange-500 hover:bg-orange-600 text-white">
                   <Lock className="w-4 h-4 mr-2" />
                   Mở tủ thuốc
@@ -836,7 +920,7 @@ export default function MedicineCabinetPage() {
                   variant="outline"
                   className="border-neutral-700 text-neutral-400 hover:bg-neutral-800 hover:text-neutral-300 bg-transparent"
                 >
-                  Xem lịch sử
+                  Khóa tủ thuốc
                 </Button>
               </div>
             </CardContent>
@@ -976,6 +1060,41 @@ export default function MedicineCabinetPage() {
                   }}
                   className="flex-1 border-neutral-700 text-neutral-400 hover:bg-neutral-800 bg-transparent"
                 >
+                  Hủy
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Assign Patient Modal - z-index 60 */}
+      {showAssignPatient && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-[60]">
+          <Card className="bg-neutral-900 border-neutral-700 w-full max-w-xs">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="text-lg font-bold text-white">Chọn bệnh nhân</CardTitle>
+              <Button variant="ghost" onClick={() => setShowAssignPatient(false)} className="text-neutral-400 hover:text-white">
+                <X className="w-4 h-4" />
+              </Button>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <select
+                id="patient"
+                value={selectedPatientId}
+                onChange={e => setSelectedPatientId(e.target.value)}
+                className="w-full mt-1 p-2 bg-neutral-800 border border-neutral-700 rounded text-white text-sm"
+              >
+                <option value="">-- Chọn bệnh nhân --</option>
+                {patients.map((p: any) => (
+                  <option key={p.id} value={p.id}>{p.name} - Phòng {p.room_number} - Giường {p.bed_number}</option>
+                ))}
+              </select>
+              <div className="flex gap-2 pt-2">
+                <Button onClick={handleAssignPatient} disabled={!selectedPatientId || assigning} className="flex-1 bg-orange-500 hover:bg-orange-600 text-white">
+                  Gán
+                </Button>
+                <Button variant="outline" onClick={() => setShowAssignPatient(false)} className="flex-1 border-neutral-700 text-neutral-400 hover:bg-neutral-800 bg-transparent">
                   Hủy
                 </Button>
               </div>

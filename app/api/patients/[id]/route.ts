@@ -132,8 +132,8 @@ export async function DELETE(_request: NextRequest, { params }: { params: { id: 
   const supabase = createServerClient()
 
   try {
-    // Xóa tủ thuốc trước (foreign key constraint)
-    const { error: cabinetError } = await supabase.from("medicine_cabinets").delete().eq("patient_id", params.id)
+    // Thay vì xóa tủ thuốc, chỉ update patient_id = null
+    const { error: cabinetError } = await supabase.from("medicine_cabinets").update({ patient_id: null }).eq("patient_id", params.id)
 
     if (cabinetError) {
       console.error("Error deleting medicine cabinets:", cabinetError)
