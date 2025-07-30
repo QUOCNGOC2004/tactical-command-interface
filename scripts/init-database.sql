@@ -485,3 +485,29 @@ SELECT
 FROM water_systems ws
 JOIN patients p ON ws.patient_id = p.id
 ORDER BY ws.room_number;
+
+-- 1. Tạo bảng ngăn thuốc (compartments)
+CREATE TABLE IF NOT EXISTS compartments (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    cabinet_id UUID REFERENCES medicine_cabinets(id) ON DELETE CASCADE,
+    compartment_type VARCHAR(20) NOT NULL CHECK (compartment_type IN ('morning', 'afternoon', 'evening')),
+    rfid_code VARCHAR(50), -- mã RFID riêng cho ngăn (nếu có)
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(cabinet_id, compartment_type)
+);
+
+-- 2. Thêm cột compartment_id vào bảng cabinet_medications để liên kết thuốc với ngăn
+ALTER TABLE cabinet_medications
+ADD COLUMN compartment_id UUID REFERENCES compartments(id) ON DELETE CASCADE;
+
+-- Thêm 3 ngăn (sáng, chiều, tối) cho mỗi tủ thuốc
+INSERT INTO compartments (cabinet_id, compartment_type, rfid_code)
+SELECT id, 'morning', NULL FROM medicine_cabinets
+ON CONFLICT DO NOTHING;
+INSERT INTO compartments (cabinet_id, compartment_type, rfid_code)
+SELECT id, 'afternoon', NULL FROM medicine_cabinets
+ON CONFLICT DO NOTHING;
+INSERT INTO compartments (cabinet_id, compartment_type, rfid_code)
+SELECT id, 'evening', NULL FROM medicine_cabinets
+ON CONFLICT DO NOTHING;

@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server"
 import { createServerClient } from "@/lib/supabase"
 
-export async function GET(request: Request, { params }: { params: { id: string } }) {
-  const supabase = createServerClient()
 
+export async function GET(request: Request, context: any) {
+  const { params } = await context;
+  const supabase = createServerClient()
   try {
     // Lấy thông tin tủ thuốc
     const { data: cabinet, error: cabinetError } = await supabase
@@ -18,56 +19,43 @@ export async function GET(request: Request, { params }: { params: { id: string }
       `)
       .eq("id", params.id)
       .single()
-
     if (cabinetError) throw cabinetError
+    // patients có thể là mảng nếu select dạng relation, lấy phần tử đầu tiên hoặc null
+    const patientObj = Array.isArray(cabinet.patients) ? cabinet.patients[0] : cabinet.patients
 
-    // ------------------------------------------------------------------
-    // Thuốc trong tủ – biến lỗi "relation does not exist" thành mảng rỗng
-    // ------------------------------------------------------------------
-    let cabinetMeds: { id: string; medication_id: string; quantity: number }[] = []
+    // Lấy danh sách ngăn thuốc của tủ
+    const { data: compartments, error: compError } = await supabase
+      .from("compartments")
+      .select("id, compartment_type, rfid_code")
+      .eq("cabinet_id", params.id)
+      .order("compartment_type", { ascending: true })
+    if (compError) throw compError
 
-    try {
-      const { data, error } = await supabase
+    // Lấy thuốc trong từng ngăn
+    const compartmentsWithMeds = []
+    for (const comp of compartments || []) {
+      // Lấy danh sách thuốc trong ngăn này
+      const { data: cabMeds } = await supabase
         .from("cabinet_medications")
-        .select("id, medication_id, quantity")
-        .eq("cabinet_id", params.id)
-
-      if (error) throw error
-      cabinetMeds = data ?? []
-    } catch (err: any) {
-      // Nếu bảng chưa được tạo -> trả về mảng rỗng để UI vẫn chạy
-      if (
-        typeof err?.message === "string" &&
-        err.message.includes("relation") &&
-        err.message.includes("cabinet_medications")
-      ) {
-        console.warn("⚠️  Table cabinet_medications chưa tồn tại – hãy chạy scripts/create-cabinet-medications-v2.sql")
-        cabinetMeds = []
-      } else {
-        throw err
-      }
-    }
-
-    const medications = []
-    for (const cabMed of cabinetMeds) {
-      const { data: medDetail } = await supabase
-        .from("medications")
-        .select("id, name, dosage, unit")
-        .eq("id", cabMed.medication_id)
-        .single()
-
-      if (medDetail) {
-        medications.push({
-          id: cabMed.id,
-          quantity: cabMed.quantity,
-          medications: medDetail,
-        })
-      }
+        .select("id, medication_id, quantity, expiry_date, medications(id, name, dosage, unit)")
+        .eq("compartment_id", comp.id)
+      const meds = (cabMeds || []).map((cabMed) => ({
+        id: cabMed.id,
+        quantity: cabMed.quantity,
+        expiry_date: cabMed.expiry_date,
+        medications: cabMed.medications,
+      }))
+      compartmentsWithMeds.push({
+        id: comp.id,
+        compartment_type: comp.compartment_type,
+        rfid_code: comp.rfid_code,
+        medications: meds,
+      })
     }
 
     // Lấy lịch uống thuốc hôm nay
     const today = new Date().toISOString().split("T")[0]
-    const { data: todaySchedules, error: schedulesError } = await supabase
+    const { data: todaySchedules } = await supabase
       .from("medication_schedules")
       .select(`
         id,
@@ -76,7 +64,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
         dosage_amount,
         medications!inner(name, dosage)
       `)
-      .eq("patient_id", cabinet.patients?.id)
+      .eq("patient_id", patientObj?.id)
       .gte("created_at", `${today}T00:00:00`)
       .lt("created_at", `${today}T23:59:59`)
       .order("time_of_day", { ascending: true })
@@ -92,21 +80,20 @@ export async function GET(request: Request, { params }: { params: { id: string }
 
     const result = {
       ...cabinet,
-      room_number: cabinet.patients ? cabinet.patients.room_number : cabinet.room_number,
-      bed_number: cabinet.patients ? cabinet.patients.bed_number : cabinet.bed_number,
-      patient: cabinet.patients
+      room_number: patientObj ? patientObj.room_number : cabinet.room_number,
+      bed_number: patientObj ? patientObj.bed_number : cabinet.bed_number,
+      patient: patientObj
         ? {
-            id: cabinet.patients.id,
-            name: cabinet.patients.name,
-            patient_code: cabinet.patients.patient_code,
-            room_number: cabinet.patients.room_number,
-            bed_number: cabinet.patients.bed_number,
+            id: patientObj.id,
+            name: patientObj.name,
+            patient_code: patientObj.patient_code,
+            room_number: patientObj.room_number,
+            bed_number: patientObj.bed_number,
           }
         : null,
-      medications,
+      compartments: compartmentsWithMeds,
       todaySchedules: transformedSchedules,
     }
-
     return NextResponse.json(result)
   } catch (error) {
     console.error("Error fetching cabinet detail:", error)
@@ -114,24 +101,14 @@ export async function GET(request: Request, { params }: { params: { id: string }
   }
 }
 
-export async function PATCH(request: Request, { params }: { params: { id: string } }) {
+export async function PATCH(request: Request, context: any) {
+  const { params } = await context;
   const supabase = createServerClient()
   try {
     const body = await request.json()
     const { patient_id } = body
-    let updateData: any = { patient_id: patient_id || null }
-    if (patient_id) {
-      // Lấy thông tin phòng và giường của bệnh nhân
-      const { data: patient, error: patientError } = await supabase
-        .from("patients")
-        .select("room_number, bed_number")
-        .eq("id", patient_id)
-        .single()
-      if (patientError) throw patientError
-      updateData.room_number = patient.room_number
-      updateData.bed_number = patient.bed_number
-    }
-    // Nếu bỏ gán thì KHÔNG update room_number và bed_number để tránh lỗi NOT NULL
+    // Gán hoặc bỏ gán bệnh nhân cho tủ thuốc
+    const updateData: any = { patient_id }
     const { error } = await supabase
       .from("medicine_cabinets")
       .update(updateData)

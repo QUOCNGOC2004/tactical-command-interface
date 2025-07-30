@@ -7,12 +7,12 @@ export async function GET(request: Request, { params }: { params: { id: string }
   try {
     const { data: cabinetMeds, error } = await supabase
       .from("cabinet_medications")
-      .select("*")
+      .select("id, medication_id, quantity, compartment_id")
       .eq("cabinet_id", params.id)
 
     if (error) throw error
 
-    // Lấy thông tin chi tiết thuốc
+    // Lấy thông tin chi tiết thuốc, trả về cả compartment_id
     const medications = []
     if (cabinetMeds) {
       for (const cabMed of cabinetMeds) {
@@ -26,6 +26,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
           medications.push({
             id: cabMed.id,
             quantity: cabMed.quantity,
+            compartment_id: cabMed.compartment_id,
             medications: medDetail,
           })
         }
@@ -44,7 +45,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
 
   try {
     const body = await request.json()
-    const { medication_id, quantity } = body
+    const { medication_id, quantity, compartment_id } = body
 
     // Kiểm tra thuốc có tồn tại trong kho không
     const { data: medication, error: medError } = await supabase
@@ -66,12 +67,13 @@ export async function POST(request: Request, { params }: { params: { id: string 
       )
     }
 
-    // Kiểm tra thuốc đã có trong tủ chưa
+    // Kiểm tra thuốc đã có trong ngăn này chưa
     const { data: existingMed, error: existingError } = await supabase
       .from("cabinet_medications")
       .select("*")
       .eq("cabinet_id", params.id)
       .eq("medication_id", medication_id)
+      .eq("compartment_id", compartment_id)
       .single()
 
     if (existingMed) {
@@ -92,6 +94,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
           cabinet_id: params.id,
           medication_id: medication_id,
           quantity: quantity,
+          compartment_id: compartment_id,
         })
         .select()
         .single()

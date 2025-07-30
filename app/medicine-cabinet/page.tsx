@@ -41,39 +41,47 @@ interface InventoryItem {
   color: string
 }
 
-interface CabinetDetail {
-  id: string
-  cabinet_code: string
-  room_number: string
-  bed_number: string
-  status: string
-  patient: {
-    id: string
-    name: string
-    patient_code: string
-    room_number?: string
-    bed_number?: string
-  } | null
+interface Compartment {
+  id: string;
+  compartment_type: 'morning' | 'afternoon' | 'evening';
+  rfid_code?: string;
   medications: Array<{
-    id: string
-    quantity: number
+    id: string;
+    quantity: number;
+    expiry_date?: string;
     medications: {
-      id: string
-      name: string
-      dosage: string
-      unit: string
-    }
-  }>
+      id: string;
+      name: string;
+      dosage: string;
+      unit: string;
+    };
+  }>;
+}
+
+interface CabinetDetail {
+  id: string;
+  cabinet_code: string;
+  room_number: string;
+  bed_number: string;
+  status: string;
+  patient: {
+    id: string;
+    name: string;
+    patient_code: string;
+    room_number?: string;
+    bed_number?: string;
+  } | null;
+  compartments: Compartment[];
   todaySchedules: Array<{
-    id: string
-    time: string
-    status: string
-    dosage_amount: number
+    id: string;
+    time: string;
+    status: string;
+    dosage_amount: number;
     medications: {
-      name: string
-      dosage: string
-    }
-  }>
+      name: string;
+      dosage: string;
+    };
+  }>;
 }
 
 interface Medication {
@@ -101,9 +109,12 @@ export default function MedicineCabinetPage() {
   const [autoDispenseError, setAutoDispenseError] = useState<string | null>(null)
 
   // Form states
+
   const [selectedMedicationId, setSelectedMedicationId] = useState("")
   const [addQuantity, setAddQuantity] = useState("")
   const [editQuantity, setEditQuantity] = useState("")
+  // Ngăn thuốc: Sáng, Chiều, Tối
+  const [selectedCompartment, setSelectedCompartment] = useState<'morning' | 'afternoon' | 'evening'>('morning')
 
   useEffect(() => {
     fetchCabinets()
@@ -238,7 +249,14 @@ export default function MedicineCabinetPage() {
   }
 
   const addMedicationToCabinet = async () => {
-    if (!selectedCabinet || !selectedMedicationId || !addQuantity) return
+    if (!selectedCabinet || !selectedMedicationId || !addQuantity || !selectedCompartment) return
+
+    // Tìm compartment_id theo selectedCompartment
+    const compartment = selectedCabinet.compartments?.find((c: Compartment) => c.compartment_type === selectedCompartment)
+    if (!compartment) {
+      alert("Không tìm thấy ngăn thuốc phù hợp!")
+      return
+    }
 
     try {
       const response = await fetch(`/api/medicine-cabinets/${selectedCabinet.id}/medications`, {
@@ -249,6 +267,7 @@ export default function MedicineCabinetPage() {
         body: JSON.stringify({
           medication_id: selectedMedicationId,
           quantity: Number.parseInt(addQuantity),
+          compartment_id: compartment.id,
         }),
       })
 
@@ -812,65 +831,90 @@ export default function MedicineCabinetPage() {
                   </div>
                 </div>
 
-                {/* Thuốc trong tủ */}
+                {/* Ngăn thuốc: Sáng, Chiều, Tối */}
                 <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-medium text-neutral-300 tracking-wider">THUỐC TRONG TỦ</h3>
+                  <h3 className="text-sm font-medium text-neutral-300 tracking-wider mb-2">NGĂN THUỐC</h3>
+                  <div className="flex gap-2 mb-2">
+                    {['morning', 'afternoon', 'evening'].map((comp) => (
+                      <Button
+                        key={comp}
+                        size="sm"
+                        variant={selectedCompartment === comp ? 'default' : 'outline'}
+                        className={
+                          selectedCompartment === comp
+                            ? 'bg-orange-500 hover:bg-orange-600 text-white'
+                            : 'border-neutral-700 text-neutral-400 hover:bg-neutral-800 bg-transparent'
+                        }
+                        onClick={() => setSelectedCompartment(comp as 'morning' | 'afternoon' | 'evening')}
+                      >
+                        {comp === 'morning' ? 'Sáng' : comp === 'afternoon' ? 'Chiều' : 'Tối'}
+                      </Button>
+                    ))}
+                  </div>
+                  {/* Danh sách thuốc theo ngăn */}
+                  <div className="space-y-2 max-h-60 overflow-y-auto">
+                    {(() => {
+                      const meds = selectedCabinet.compartments?.find((c: Compartment) => c.compartment_type === selectedCompartment)?.medications || [];
+                      if (meds.length > 0) {
+                        return meds.map((med: Compartment['medications'][number]) => (
+                          <div key={med.id} className="flex items-center justify-between p-2 bg-neutral-800 rounded">
+                            <div className="flex items-center gap-2">
+                              <Package className="w-4 h-4 text-orange-500" />
+                              <div>
+                                <div className="text-sm text-white">{med.medications.name}</div>
+                                <div className="text-xs text-neutral-400">{med.medications.dosage}</div>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <div className="text-right">
+                                <div className="text-sm text-white font-mono">{med.quantity}</div>
+                                <div className="text-xs text-neutral-400">{med.medications.unit || "viên"}</div>
+                              </div>
+                              <div className="flex gap-1">
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => {
+                                    setEditingMedication(med)
+                                    setEditQuantity(med.quantity.toString())
+                                  }}
+                                  className="text-neutral-400 hover:text-white p-1 h-6 w-6"
+                                >
+                                  <Edit className="w-3 h-3" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => deleteMedicationFromCabinet(med.id)}
+                                  className="text-red-400 hover:text-red-300 p-1 h-6 w-6"
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      } else {
+                        return (
+                          <div className="text-center text-neutral-500 py-4">
+                            <Package className="w-6 h-6 mx-auto mb-2 opacity-50" />
+                            <p className="text-xs">Chưa có thuốc trong ngăn này</p>
+                          </div>
+                        )
+                      }
+                    })()}
+                  </div>
+                  {/* Nút thêm thuốc chỉ hiện khi đã chọn ngăn */}
+                  <div className="pt-2">
                     <Button
                       size="sm"
                       onClick={() => setShowAddMedication(true)}
-                      className="bg-orange-500 hover:bg-orange-600 text-white text-xs"
+                      className="bg-orange-500 hover:bg-orange-600 text-white text-xs w-full"
+                      disabled={!selectedCompartment}
                     >
                       <Plus className="w-3 h-3 mr-1" />
-                      Thêm thuốc
+                      Thêm thuốc vào ngăn {selectedCompartment === 'morning' ? 'Sáng' : selectedCompartment === 'afternoon' ? 'Chiều' : 'Tối'}
                     </Button>
-                  </div>
-                  <div className="space-y-2 max-h-60 overflow-y-auto">
-                    {selectedCabinet.medications.length > 0 ? (
-                      selectedCabinet.medications.map((med) => (
-                        <div key={med.id} className="flex items-center justify-between p-2 bg-neutral-800 rounded">
-                          <div className="flex items-center gap-2">
-                            <Package className="w-4 h-4 text-orange-500" />
-                            <div>
-                              <div className="text-sm text-white">{med.medications.name}</div>
-                              <div className="text-xs text-neutral-400">{med.medications.dosage}</div>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <div className="text-right">
-                              <div className="text-sm text-white font-mono">{med.quantity}</div>
-                              <div className="text-xs text-neutral-400">{med.medications.unit || "viên"}</div>
-                            </div>
-                            <div className="flex gap-1">
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => {
-                                  setEditingMedication(med)
-                                  setEditQuantity(med.quantity.toString())
-                                }}
-                                className="text-neutral-400 hover:text-white p-1 h-6 w-6"
-                              >
-                                <Edit className="w-3 h-3" />
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => deleteMedicationFromCabinet(med.id)}
-                                className="text-red-400 hover:text-red-300 p-1 h-6 w-6"
-                              >
-                                <Trash2 className="w-3 h-3" />
-                              </Button>
-                            </div>
-                          </div>
-                        </div>
-                      ))
-                    ) : (
-                      <div className="text-center text-neutral-500 py-4">
-                        <Package className="w-6 h-6 mx-auto mb-2 opacity-50" />
-                        <p className="text-xs">Chưa có thuốc trong tủ</p>
-                      </div>
-                    )}
                   </div>
                 </div>
 
