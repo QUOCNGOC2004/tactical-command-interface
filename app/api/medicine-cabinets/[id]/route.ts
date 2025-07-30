@@ -107,8 +107,19 @@ export async function PATCH(request: Request, context: any) {
   try {
     const body = await request.json()
     const { patient_id } = body
-    // Gán hoặc bỏ gán bệnh nhân cho tủ thuốc
-    const updateData: any = { patient_id }
+    let updateData: any = { patient_id }
+    if (patient_id) {
+      // Lấy thông tin bệnh nhân để đồng bộ room_number, bed_number
+      const { data: patient, error: patientError } = await supabase
+        .from("patients")
+        .select("room_number, bed_number")
+        .eq("id", patient_id)
+        .single()
+      if (!patientError && patient) {
+        updateData.room_number = patient.room_number
+        updateData.bed_number = patient.bed_number
+      }
+    }
     const { error } = await supabase
       .from("medicine_cabinets")
       .update(updateData)
