@@ -98,6 +98,7 @@ export default function MedicineCabinetPage() {
   const [patients, setPatients] = useState<any[]>([])
   const [assigning, setAssigning] = useState(false)
   const [selectedPatientId, setSelectedPatientId] = useState("")
+  const [autoDispenseError, setAutoDispenseError] = useState<string | null>(null)
 
   // Form states
   const [selectedMedicationId, setSelectedMedicationId] = useState("")
@@ -205,6 +206,7 @@ export default function MedicineCabinetPage() {
   const autoDispenseMedications = async () => {
     try {
       setAutoDispenseLoading(true)
+      setAutoDispenseError(null)
       const response = await fetch("/api/medication-schedules/auto-dispense", {
         method: "POST",
       })
@@ -219,9 +221,17 @@ export default function MedicineCabinetPage() {
             fetchCabinetDetail(selectedCabinet.id)
           }
         }
+        // Nếu có thông báo lỗi từ backend (ví dụ: thiếu thuốc), hiển thị lên giao diện
+        if (result.errors && result.errors.length > 0) {
+          setAutoDispenseError(result.errors.join("; "))
+        }
+      } else {
+        const errorData = await response.json()
+        setAutoDispenseError(errorData.error || "Có lỗi xảy ra khi tự động phát thuốc")
       }
     } catch (error) {
       console.error("Error in auto-dispense:", error)
+      setAutoDispenseError("Có lỗi xảy ra khi tự động phát thuốc")
     } finally {
       setAutoDispenseLoading(false)
     }
@@ -463,6 +473,12 @@ export default function MedicineCabinetPage() {
         <div className="bg-orange-500/20 border border-orange-500 rounded-lg p-3 flex items-center gap-2">
           <RefreshCw className="w-4 h-4 text-orange-500 animate-spin" />
           <span className="text-orange-500 text-sm">Đang kiểm tra và phát thuốc tự động...</span>
+        </div>
+      )}
+      {/* Thông báo lỗi auto-dispense */}
+      {autoDispenseError && (
+        <div className="bg-red-500 text-white p-2 rounded mb-2 text-center">
+          {autoDispenseError}
         </div>
       )}
 

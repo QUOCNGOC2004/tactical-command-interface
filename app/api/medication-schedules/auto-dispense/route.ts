@@ -27,6 +27,7 @@ export async function POST() {
     if (schedulesError) throw schedulesError
 
     let processedCount = 0
+    let errors: string[] = []
 
     if (schedules && schedules.length > 0) {
       for (const schedule of schedules) {
@@ -39,9 +40,7 @@ export async function POST() {
           .single()
 
         if (cabinetError || !cabinet) {
-          console.log(
-            `Không tìm thấy tủ thuốc cho bệnh nhân phòng ${schedule.patients.room_number} giường ${schedule.patients.bed_number}`,
-          )
+          errors.push(`Không tìm thấy tủ thuốc cho bệnh nhân phòng ${schedule.patients.room_number} giường ${schedule.patients.bed_number}`)
           continue
         }
 
@@ -54,14 +53,12 @@ export async function POST() {
           .single()
 
         if (cabinetMedError || !cabinetMed) {
-          console.log(`Thuốc ${schedule.medications.name} không có trong tủ`)
+          errors.push(`Thuốc ${schedule.medications.name} không có trong tủ bệnh nhân phòng ${schedule.patients.room_number} giường ${schedule.patients.bed_number}`)
           continue
         }
 
         if (cabinetMed.quantity < schedule.dosage_amount) {
-          console.log(
-            `Không đủ thuốc ${schedule.medications.name} trong tủ. Cần: ${schedule.dosage_amount}, Có: ${cabinetMed.quantity}`,
-          )
+          errors.push(`Không đủ thuốc ${schedule.medications.name} trong tủ bệnh nhân phòng ${schedule.patients.room_number} giường ${schedule.patients.bed_number}. Cần: ${schedule.dosage_amount}, Có: ${cabinetMed.quantity}`)
           continue
         }
 
@@ -70,10 +67,9 @@ export async function POST() {
           .from("cabinet_medications")
           .update({ quantity: cabinetMed.quantity - schedule.dosage_amount })
           .eq("cabinet_id", cabinet.id)
-          .eq("medication_id", schedule.medication_id)
 
         if (updateCabinetError) {
-          console.error("Lỗi cập nhật thuốc trong tủ:", updateCabinetError)
+          errors.push(`Lỗi cập nhật thuốc trong tủ: ${updateCabinetError.message}`)
           continue
         }
 
@@ -87,14 +83,11 @@ export async function POST() {
           .eq("id", schedule.id)
 
         if (updateScheduleError) {
-          console.error("Lỗi cập nhật trạng thái lịch:", updateScheduleError)
+          errors.push(`Lỗi cập nhật trạng thái lịch: ${updateScheduleError.message}`)
           continue
         }
 
         processedCount++
-        console.log(
-          `Đã phát thuốc ${schedule.medications.name} cho bệnh nhân phòng ${schedule.patients.room_number} giường ${schedule.patients.bed_number}`,
-        )
       }
     }
 
@@ -102,6 +95,7 @@ export async function POST() {
       success: true,
       processedCount,
       message: `Đã xử lý ${processedCount} lịch uống thuốc`,
+      errors,
     })
   } catch (error) {
     console.error("Error in auto-dispense:", error)

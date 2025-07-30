@@ -119,10 +119,22 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   try {
     const body = await request.json()
     const { patient_id } = body
-    // Cho phép gán hoặc bỏ gán (nếu patient_id là null)
+    let updateData: any = { patient_id: patient_id || null }
+    if (patient_id) {
+      // Lấy thông tin phòng và giường của bệnh nhân
+      const { data: patient, error: patientError } = await supabase
+        .from("patients")
+        .select("room_number, bed_number")
+        .eq("id", patient_id)
+        .single()
+      if (patientError) throw patientError
+      updateData.room_number = patient.room_number
+      updateData.bed_number = patient.bed_number
+    }
+    // Nếu bỏ gán thì KHÔNG update room_number và bed_number để tránh lỗi NOT NULL
     const { error } = await supabase
       .from("medicine_cabinets")
-      .update({ patient_id: patient_id || null })
+      .update(updateData)
       .eq("id", params.id)
     if (error) throw error
     return NextResponse.json({ success: true })
