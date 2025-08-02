@@ -14,14 +14,6 @@ export async function GET() {
           id,
           cabinet_code,
           status
-        ),
-        health_monitoring (
-          heart_rate,
-          blood_pressure_systolic,
-          blood_pressure_diastolic,
-          temperature,
-          spo2,
-          recorded_at
         )
       `,
       )

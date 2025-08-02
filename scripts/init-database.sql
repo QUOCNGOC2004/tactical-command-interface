@@ -50,7 +50,7 @@ CREATE TABLE IF NOT EXISTS medication_schedules (
     medication_id UUID REFERENCES medications(id) ON DELETE CASCADE,
     cabinet_id UUID REFERENCES medicine_cabinets(id) ON DELETE CASCADE,
     time_of_day TIME NOT NULL,
-    compartment VARCHAR(20) NOT NULL CHECK (compartment IN ('morning', 'afternoon', 'evening')),
+    compartment VARCHAR(20) NOT NULL CHECK (compartment IN ('compartment1', 'compartment2')),
     dosage_amount INTEGER NOT NULL,
     is_active BOOLEAN DEFAULT TRUE,
     last_taken TIMESTAMP WITH TIME ZONE,
@@ -490,7 +490,7 @@ ORDER BY ws.room_number;
 CREATE TABLE IF NOT EXISTS compartments (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     cabinet_id UUID REFERENCES medicine_cabinets(id) ON DELETE CASCADE,
-    compartment_type VARCHAR(20) NOT NULL CHECK (compartment_type IN ('morning', 'afternoon', 'evening')),
+    compartment_type VARCHAR(20) NOT NULL CHECK (compartment_type IN ('compartment1', 'compartment2')),
     rfid_code VARCHAR(50), -- mã RFID riêng cho ngăn (nếu có)
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -501,18 +501,20 @@ CREATE TABLE IF NOT EXISTS compartments (
 ALTER TABLE cabinet_medications
 ADD COLUMN compartment_id UUID REFERENCES compartments(id) ON DELETE CASCADE;
 
--- Thêm 3 ngăn (sáng, chiều, tối) cho mỗi tủ thuốc
+-- Thêm 2 ngăn cho mỗi tủ thuốc
 INSERT INTO compartments (cabinet_id, compartment_type, rfid_code)
-SELECT id, 'morning', NULL FROM medicine_cabinets
+SELECT id, 'compartment1', NULL FROM medicine_cabinets
 ON CONFLICT DO NOTHING;
 INSERT INTO compartments (cabinet_id, compartment_type, rfid_code)
-SELECT id, 'afternoon', NULL FROM medicine_cabinets
-ON CONFLICT DO NOTHING;
-INSERT INTO compartments (cabinet_id, compartment_type, rfid_code)
-SELECT id, 'evening', NULL FROM medicine_cabinets
+SELECT id, 'compartment2', NULL FROM medicine_cabinets
 ON CONFLICT DO NOTHING;
 
 ALTER TABLE medication_schedules ADD COLUMN compartment_id UUID REFERENCES compartments(id) ON DELETE SET NULL;
 DELETE FROM cabinet_medications WHERE compartment_id IS NULL;
 -- Drop health monitoring table
 DROP TABLE IF EXISTS health_monitoring;
+
+-- Delete evening compartments
+DELETE FROM compartments WHERE compartment_type = 'evening';
+
+

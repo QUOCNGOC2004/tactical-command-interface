@@ -43,7 +43,7 @@ interface InventoryItem {
 
 interface Compartment {
   id: string;
-  compartment_type: 'morning' | 'afternoon' | 'evening';
+  compartment_type: 'compartment1' | 'compartment2';
   rfid_code?: string;
   medications: Array<{
     id: string;
@@ -113,8 +113,8 @@ export default function MedicineCabinetPage() {
   const [selectedMedicationId, setSelectedMedicationId] = useState("")
   const [addQuantity, setAddQuantity] = useState("")
   const [editQuantity, setEditQuantity] = useState("")
-  // Ngăn thuốc: Sáng, Chiều, Tối
-  const [selectedCompartment, setSelectedCompartment] = useState<'morning' | 'afternoon' | 'evening'>('morning')
+  // Ngăn thuốc: Ngăn 1, Ngăn 2
+  const [selectedCompartment, setSelectedCompartment] = useState<'compartment1' | 'compartment2'>('compartment1')
 
   useEffect(() => {
     fetchCabinets()
@@ -835,7 +835,7 @@ export default function MedicineCabinetPage() {
                 <div className="space-y-4">
                   <h3 className="text-sm font-medium text-neutral-300 tracking-wider mb-2">NGĂN THUỐC</h3>
                   <div className="flex gap-2 mb-2">
-                    {['morning', 'afternoon', 'evening'].map((comp) => (
+                    {['compartment1', 'compartment2'].map((comp) => (
                       <Button
                         key={comp}
                         size="sm"
@@ -845,9 +845,9 @@ export default function MedicineCabinetPage() {
                             ? 'bg-orange-500 hover:bg-orange-600 text-white'
                             : 'border-neutral-700 text-neutral-400 hover:bg-neutral-800 bg-transparent'
                         }
-                        onClick={() => setSelectedCompartment(comp as 'morning' | 'afternoon' | 'evening')}
+                        onClick={() => setSelectedCompartment(comp as 'compartment1' | 'compartment2')}
                       >
-                        {comp === 'morning' ? 'Sáng' : comp === 'afternoon' ? 'Chiều' : 'Tối'}
+                        {comp === 'compartment1' ? 'Ngăn 1' : 'Ngăn 2'}
                       </Button>
                     ))}
                   </div>
@@ -913,7 +913,7 @@ export default function MedicineCabinetPage() {
                       disabled={!selectedCompartment}
                     >
                       <Plus className="w-3 h-3 mr-1" />
-                      Thêm thuốc vào ngăn {selectedCompartment === 'morning' ? 'Sáng' : selectedCompartment === 'afternoon' ? 'Chiều' : 'Tối'}
+                      Thêm thuốc vào {selectedCompartment === 'compartment1' ? 'Ngăn 1' : 'Ngăn 2'}
                     </Button>
                   </div>
                 </div>
