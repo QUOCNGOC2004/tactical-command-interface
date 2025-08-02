@@ -30,7 +30,7 @@ interface MedicationSchedule {
   medication_id: string
   cabinet_id: string
   time_of_day: string
-  compartment: "morning" | "afternoon" | "evening"
+  compartment: "compartment1" | "compartment2"
   dosage_amount: number
   is_active: boolean
   status: "scheduled" | "pending" | "taken" | "missed" | "skipped"
@@ -52,7 +52,7 @@ export default function SchedulesPage() {
     patient_id: "",
     medication_id: "",
     time_of_day: "",
-    compartment: "morning" as "morning" | "afternoon" | "evening",
+    compartment: "compartment1" as "compartment1" | "compartment2",
     dosage_amount: 1,
     notes: "",
   })
@@ -186,7 +186,7 @@ export default function SchedulesPage() {
       patient_id: "",
       medication_id: "",
       time_of_day: "",
-      compartment: "morning",
+      compartment: "compartment1",
       dosage_amount: 1,
       notes: "",
     })
@@ -226,12 +226,10 @@ export default function SchedulesPage() {
 
   const getCompartmentText = (compartment: string) => {
     switch (compartment) {
-      case "morning":
-        return "SÁNG"
-      case "afternoon":
-        return "CHIỀU"
-      case "evening":
-        return "TỐI"
+      case "compartment1":
+        return "NGĂN 1"
+      case "compartment2":
+        return "NGĂN 2"
       default:
         return compartment.toUpperCase()
     }
@@ -488,16 +486,15 @@ export default function SchedulesPage() {
                     <Select
                       value={formData.compartment}
                       onValueChange={(value) =>
-                        setFormData({ ...formData, compartment: value as "morning" | "afternoon" | "evening" })
+                        setFormData({ ...formData, compartment: value as "compartment1" | "compartment2" })
                       }
                     >
                       <SelectTrigger className="bg-neutral-800 border-neutral-600 text-white">
                         <SelectValue placeholder="Chọn ngăn" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="morning">Sáng</SelectItem>
-                        <SelectItem value="afternoon">Chiều</SelectItem>
-                        <SelectItem value="evening">Tối</SelectItem>
+                        <SelectItem value="compartment1">Ngăn 1</SelectItem>
+                        <SelectItem value="compartment2">Ngăn 2</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>

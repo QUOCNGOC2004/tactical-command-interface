@@ -19,18 +19,10 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
           cabinet_code,
           status,
           bed_number
-        ),
-        health_monitoring (
-          heart_rate,
-          blood_pressure_systolic,
-          blood_pressure_diastolic,
-          temperature,
-          spo2,
-          recorded_at
         )
       `,
       )
-      .eq("id", params.id)
+      .eq("id", await params.id)
       .single()
 
     if (error || !patient) {

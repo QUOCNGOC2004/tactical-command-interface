@@ -262,9 +262,8 @@ SELECT
         ELSE '20:00:00'::TIME
     END,
     CASE 
-        WHEN random() < 0.33 THEN 'morning'
-        WHEN random() < 0.66 THEN 'afternoon'
-        ELSE 'evening'
+        WHEN random() < 0.5 THEN 'compartment1'
+        ELSE 'compartment2'
     END,
     1
 FROM patients p
