@@ -20,12 +20,13 @@ interface WaterSystem {
   next_schedule?: string
   daily_consumption: number
   max_daily_consumption: number
-  patients?: {
-    id: string
-    name: string
-    patient_code: string
-    room_number: string
-    bed_number?: string
+  medicine_cabinets?: {
+    cabinet_code: string;
+    patients?: {
+      name: string;
+      room_number: string;
+      bed_number?: string;
+    }
   }
 }
 
@@ -148,7 +149,9 @@ export default function WaterSystemPage() {
         const system = waterSystems.find(ws => ws.id === systemId)
         let location = ""
         if (system) {
-          location = ` (Phòng ${system.room_number}${system.bed_number ? ` - Giường ${system.bed_number}` : ""}${system.patients?.name ? ` - ${system.patients.name}` : ""})`
+          location = system.medicine_cabinets?.patients
+            ? ` (Phòng ${system.medicine_cabinets.patients.room_number}${system.medicine_cabinets.patients.bed_number ? ` - Giường ${system.medicine_cabinets.patients.bed_number}` : ""}${system.medicine_cabinets.patients.name ? ` - ${system.medicine_cabinets.patients.name}` : ""})`
+            : "";
         }
         if (errorData.error === "Hết nước trong bình") {
           setWaterAlert(`Hết nước trong bình${location}! Vui lòng bơm nước.`)
@@ -289,125 +292,12 @@ export default function WaterSystemPage() {
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-white tracking-wider">HỆ THỐNG CUNG CẤP NƯỚC</h1>
-          <p className="text-sm text-neutral-400">Quản lý và giám sát hệ thống nước tự động</p>
-        </div>
-        <div className="flex gap-2">
-          <Button 
-            className="bg-orange-500 hover:bg-orange-600 text-white"
-            onClick={() => {
-              fetchWaterSystems()
-              fetchSystemStats()
-            }}
-          >
-            Làm mới dữ liệu
-          </Button>
-          <Button 
-            className="bg-green-500 hover:bg-green-600 text-white"
-            onClick={async () => {
-              try {
-                const response = await fetch("/api/water-systems/sync", {
-                  method: "POST"
-                })
-                if (response.ok) {
-                  const result = await response.json()
-                  alert(`Đồng bộ thành công!\n${result.message}`)
-                  // Refresh data after sync
-                  fetchWaterSystems()
-                  fetchSystemStats()
-                } else {
-                  const error = await response.json()
-                  alert(`Lỗi đồng bộ: ${error.error}`)
-                }
-              } catch (error) {
-                console.error("Error syncing:", error)
-                alert("Lỗi khi đồng bộ hệ thống nước")
-              }
-            }}
-          >
-            Đồng bộ với bệnh nhân
-          </Button>
-          <Button 
-            className="bg-red-500 hover:bg-red-600 text-white"
-            onClick={async () => {
-              try {
-                const response = await fetch("/api/water-systems/status")
-                if (response.ok) {
-                  const stats = await response.json()
-                  console.log("Current stats:", stats)
-                  alert(`Thống kê hiện tại:\n- Tổng hệ thống: ${stats.totalSystems}\n- Hoạt động: ${stats.activeSystems}\n- Đang phát: ${stats.dispensingSystems}\n- Cảnh báo: ${stats.lowWaterSystems}`)
-                }
-              } catch (error) {
-                console.error("Error checking stats:", error)
-              }
-            }}
-          >
-            Kiểm tra trạng thái
-          </Button>
-          <Button className="bg-orange-500 hover:bg-orange-600 text-white">Bơm nước khẩn cấp</Button>
-        </div>
+      <div className="flex flex-col gap-2">
+        <h1 className="text-2xl font-bold text-white tracking-wider">HỆ THỐNG CUNG CẤP NƯỚC</h1>
+        <p className="text-sm text-neutral-400">Quản lý và giám sát hệ thống nước tự động</p>
       </div>
 
-      {/* System Overview Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="bg-neutral-900 border-neutral-700">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-neutral-400 tracking-wider">HỆ THỐNG HOẠT ĐỘNG</p>
-                <p className="text-2xl font-bold text-white font-mono">
-                  {systemStats ? `${systemStats.activeSystems}/${systemStats.totalSystems}` : "0/0"}
-                </p>
-              </div>
-              <CheckCircle className="w-8 h-8 text-white" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-neutral-900 border-neutral-700">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-neutral-400 tracking-wider">CẢNH BÁO NƯỚC</p>
-                <p className="text-2xl font-bold text-red-500 font-mono">
-                  {waterSystems.filter(ws => ws.water_level < 40).length}
-                </p>
-              </div>
-              <AlertTriangle className="w-8 h-8 text-red-500" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-neutral-900 border-neutral-700">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-neutral-400 tracking-wider">ĐANG PHÁT NƯỚC</p>
-                <p className="text-2xl font-bold text-orange-500 font-mono">
-                  {systemStats?.dispensingSystems || 0}
-                </p>
-              </div>
-              <Droplets className="w-8 h-8 text-orange-500" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-neutral-900 border-neutral-700">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-neutral-400 tracking-wider">TIÊU THỤ HÔM NAY</p>
-                <p className="text-2xl font-bold text-white font-mono">
-                  {systemStats ? `${(systemStats.totalConsumption / 1000).toFixed(1)}L` : "0L"}
-                </p>
-              </div>
-              <Droplets className="w-8 h-8 text-white" />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      {/* ...đã xóa các mục thống kê hệ thống nước... */}
 
       {/* Water Systems Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
@@ -420,12 +310,26 @@ export default function WaterSystemPage() {
               <div className="flex items-start justify-between">
                 <div>
                   <CardTitle className="text-sm font-bold text-white tracking-wider">
-                    PHÒNG {system.room_number}
-                    {system.bed_number && ` - GIƯỜNG ${system.bed_number}`}
+                    HỆ THỐNG NƯỚC: {system.medicine_cabinets?.cabinet_code || system.system_code}
                   </CardTitle>
-                  <p className="text-xs text-neutral-400">
-                    {system.patients?.name || "Chưa có bệnh nhân"}
-                  </p>
+                  <div className="text-xs text-neutral-400">
+                    Tủ thuốc: {system.medicine_cabinets?.cabinet_code ? system.medicine_cabinets.cabinet_code : "Chưa liên kết"}
+                  </div>
+                  <div className="text-xs text-neutral-400">
+                    {system.medicine_cabinets?.patients?.name ? (
+                      <>
+                        Bệnh nhân: {system.medicine_cabinets.patients.name}
+                        <div>
+                          {system.medicine_cabinets.patients.room_number && (
+                            <span>Phòng: {system.medicine_cabinets.patients.room_number}</span>
+                          )}
+                          {system.medicine_cabinets.patients.bed_number && (
+                            <span> &ndash; Giường: {system.medicine_cabinets.patients.bed_number}</span>
+                          )}
+                        </div>
+                      </>
+                    ) : "Chưa có bệnh nhân"}
+                  </div>
                 </div>
                 <div className="flex items-center gap-2">
                   {getStatusIcon(system.status)}
@@ -447,51 +351,7 @@ export default function WaterSystemPage() {
                     className={`h-3 rounded-full transition-all duration-300 ${getWaterLevelColor(system.water_level)}`}
                     style={{ width: `${system.water_level}%` }}
                   ></div>
-                  {/* Water animation effect */}
-                  {system.status === "dispensing" && (
-                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-pulse"></div>
-                  )}
                 </div>
-              </div>
-
-              {/* System Info */}
-              <div className="grid grid-cols-2 gap-4 text-xs">
-                <div>
-                  <div className="text-neutral-400 mb-1">Phát lần cuối</div>
-                  <div className="text-white font-mono">{formatTime(system.last_dispense)}</div>
-                </div>
-                <div>
-                  <div className="text-neutral-400 mb-1">Tiêu thụ hôm nay</div>
-                  <div className="text-white font-mono">{system.daily_consumption}ml</div>
-                </div>
-                <div>
-                  <div className="text-neutral-400 mb-1">Trạng thái bơm</div>
-                  <div className={`font-mono ${getPumpStatusColor(system.pump_status)}`}>
-                    {getPumpStatusText(system.pump_status)}
-                  </div>
-                </div>
-              </div>
-
-              {/* Control Buttons */}
-              <div className="flex gap-2">
-                <Button
-                  size="sm"
-                  className="flex-1 bg-orange-500 hover:bg-orange-600 text-white text-xs"
-                  disabled={system.status === "dispensing" || dispensingSystems.has(system.id)}
-                  onClick={() => handleDispenseWater(system.id)}
-                >
-                  <Droplets className="w-3 h-3 mr-1" />
-                  {dispensingSystems.has(system.id) ? "Đang phát..." : "Phát nước"}
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="border-neutral-700 text-neutral-400 hover:bg-neutral-800 hover:text-neutral-300 bg-transparent text-xs"
-                  onClick={() => handleRefillWater(system.id)}
-                >
-                  <Zap className="w-3 h-3 mr-1" />
-                  Bơm
-                </Button>
               </div>
             </CardContent>
           </Card>

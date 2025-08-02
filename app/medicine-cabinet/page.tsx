@@ -543,7 +543,7 @@ export default function MedicineCabinetPage() {
                         }`}
                       ></div>
                       <div>
-                        <div className="text-xs text-white font-mono">Tủ thuốc {idx + 1}</div>
+                        <div className="text-xs text-white font-mono">Tủ thuốc: {cabinet.cabinet_code}</div>
                         {/* Chỉ hiện vị trí nếu đã gán bệnh nhân */}
                         {cabinet.patient && cabinet.patient.room_number && cabinet.patient.bed_number ? (
                           <div className="text-xs text-neutral-500 flex items-center gap-1">
@@ -773,7 +773,7 @@ export default function MedicineCabinetPage() {
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
                 <CardTitle className="text-xl font-bold text-white tracking-wider">
-                  TỦ THUỐC {cabinets.findIndex(c => c.id === selectedCabinet.id) + 1}
+                  TỦ THUỐC: {selectedCabinet.cabinet_code}
                 </CardTitle>
                 {/* Chỉ hiện vị trí nếu đã gán bệnh nhân */}
                 {selectedCabinet.patient && selectedCabinet.patient.room_number && selectedCabinet.patient.bed_number ? (

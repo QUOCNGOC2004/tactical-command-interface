@@ -302,3 +302,62 @@ FROM patients p
 WHERE p.id IS NOT NULL;
 
 -- Hoàn tất
+
+-- =================================================================
+-- SCRIPT CẬP NHẬT BẢNG water_systems
+-- =================================================================
+
+-- Bước 1: Thêm cột cabinet_id và các ràng buộc cần thiết
+-- Thêm cột mới để lưu liên kết tới tủ thuốc
+ALTER TABLE water_systems ADD COLUMN cabinet_id UUID;
+
+-- Thêm ràng buộc khóa ngoại để liên kết water_systems với medicine_cabinets
+ALTER TABLE water_systems
+ADD CONSTRAINT fk_water_systems_cabinet
+    FOREIGN KEY (cabinet_id)
+    REFERENCES medicine_cabinets(id)
+    ON DELETE SET NULL; -- Nếu tủ thuốc bị xóa, cabinet_id trong hệ thống nước sẽ thành NULL
+
+-- Thêm ràng buộc UNIQUE để đảm bảo mỗi tủ thuốc chỉ có một hệ thống nước (quan hệ 1-1)
+ALTER TABLE water_systems ADD CONSTRAINT uq_water_systems_cabinet_id UNIQUE (cabinet_id);
+
+-- Tạo chỉ mục (index) để tối ưu hóa truy vấn trên cột mới
+CREATE INDEX IF NOT EXISTS idx_water_systems_cabinet_id ON water_systems(cabinet_id);
+
+-- ---
+
+-- Bước 2: Cập nhật dữ liệu cho 3 hệ thống nước tương ứng với 3 tủ thuốc
+-- Script này giả định rằng bạn đã có các hệ thống nước và tủ thuốc tương ứng trong cùng một phòng
+-- và muốn liên kết chúng lại với nhau.
+UPDATE water_systems ws
+SET cabinet_id = mc.id
+FROM medicine_cabinets mc
+WHERE ws.room_number = mc.room_number; -- Liên kết dựa trên số phòng
+
+-- Nếu bạn chưa có hệ thống nước nào và muốn tạo mới 3 cái tương ứng với 3 tủ thuốc đầu tiên,
+-- bạn có thể dùng lệnh INSERT sau thay cho lệnh UPDATE ở trên:
+/*
+INSERT INTO water_systems (system_code, cabinet_id, status, water_level, pump_status, daily_consumption)
+SELECT
+  'WS-' || mc.room_number,
+  mc.id,
+  'active',
+  100,
+  'ready',
+  0
+FROM medicine_cabinets mc
+LIMIT 3;
+*/
+
+-- ---
+
+-- Bước 3: (Tùy chọn) Xóa các cột cũ sau khi đã chuyển dữ liệu sang cabinet_id
+-- Chạy đoạn này sau khi bạn đã chắc chắn rằng việc liên kết dữ liệu ở Bước 2 thành công.
+ALTER TABLE water_systems
+DROP COLUMN room_number,
+DROP COLUMN bed_number,
+DROP COLUMN patient_id;
+
+-- =================================================================
+-- HOÀN TẤT
+-- =================================================================

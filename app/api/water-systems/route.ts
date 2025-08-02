@@ -9,29 +9,15 @@ export async function GET() {
       .from("water_systems")
       .select(`
         *,
-        patients (
-          id,
-          name,
-          patient_code,
-          room_number,
-          bed_number
-        ),
-        water_schedules (
-          id,
-          schedule_time,
-          dispense_amount,
-          status,
-          last_dispensed
-        ),
-        water_dispenser_logs (
-          id,
-          water_level,
-          dispensed_amount,
-          trigger_type,
-          dispensed_at
+        medicine_cabinets (
+          cabinet_code,
+          patients (
+            name,
+            room_number,
+            bed_number
+          )
         )
       `)
-      .not("patient_id", "is", null) // Chỉ lấy hệ thống có bệnh nhân
       .order("created_at", { ascending: false })
 
     if (error) throw error
@@ -68,44 +54,39 @@ export async function POST(request: Request) {
   const supabase = createServerClient()
 
   try {
-    const body = await request.json()
-    const { 
-      room_number, 
-      bed_number, 
-      patient_id, 
+    const body = await request.json();
+    const {
+      cabinet_id,
       status = "active",
       water_level = 100,
       pump_status = "ready",
       max_daily_consumption = 2000
-    } = body
+    } = body;
 
-    // Kiểm tra phòng đã có hệ thống nước chưa
+    // Kiểm tra tủ đã có hệ thống nước chưa
     const { data: existingSystem, error: checkError } = await supabase
       .from("water_systems")
       .select("id")
-      .eq("room_number", room_number)
-      .eq("bed_number", bed_number)
-      .single()
+      .eq("cabinet_id", cabinet_id)
+      .single();
 
     if (checkError && checkError.code !== "PGRST116") {
-      throw checkError
+      throw checkError;
     }
 
     if (existingSystem) {
-      return NextResponse.json({ error: "Hệ thống nước cho phòng này đã tồn tại" }, { status: 400 })
+      return NextResponse.json({ error: "Tủ thuốc này đã có hệ thống nước" }, { status: 400 });
     }
 
     // Tạo mã hệ thống nước
-    const system_code = `WS-${Date.now().toString().slice(-6)}`
+    const system_code = `WS-${Date.now().toString().slice(-6)}`;
 
     // Thêm hệ thống nước mới
     const { data: waterSystem, error: insertError } = await supabase
       .from("water_systems")
       .insert({
         system_code,
-        room_number,
-        bed_number,
-        patient_id,
+        cabinet_id,
         status,
         water_level,
         pump_status,
@@ -113,11 +94,11 @@ export async function POST(request: Request) {
         daily_consumption: 0
       })
       .select()
-      .single()
+      .single();
 
-    if (insertError) throw insertError
+    if (insertError) throw insertError;
 
-    return NextResponse.json(waterSystem)
+    return NextResponse.json(waterSystem);
   } catch (error) {
     console.error("Error creating water system:", error)
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 })
