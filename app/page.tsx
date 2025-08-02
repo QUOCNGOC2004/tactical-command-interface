@@ -255,10 +255,6 @@ export default function DashboardOverview() {
               <Pill className="w-6 h-6" />
               <span className="text-sm">Quản lý thuốc</span>
             </Button>
-            <Button className="h-20 bg-green-500/20 hover:bg-green-500/30 border border-green-500/30 text-green-300 hover:text-green-200 flex-col gap-2">
-              <Heart className="w-6 h-6" />
-              <span className="text-sm">Theo dõi sức khỏe</span>
-            </Button>
             <Button className="h-20 bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 text-red-300 hover:text-red-200 flex-col gap-2">
               <AlertTriangle className="w-6 h-6" />
               <span className="text-sm">Khẩn cấp</span>

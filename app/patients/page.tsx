@@ -29,14 +29,6 @@ interface Patient {
     cabinet_code: string
     status: string
   }>
-  health_monitoring?: Array<{
-    heart_rate: number
-    blood_pressure_systolic: number
-    blood_pressure_diastolic: number
-    temperature: number
-    spo2: number
-    recorded_at: string
-  }>
 }
 
 interface Doctor {
@@ -408,7 +400,6 @@ export default function PatientsPage() {
       {/* Patient Cards */}
       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
         {filteredPatients.map((patient) => {
-          const latestVitals = patient.health_monitoring?.[0]
           return (
             <Card
               key={patient.id}
@@ -461,29 +452,7 @@ export default function PatientsPage() {
                   </div>
                 )}
 
-                {/* Vital Signs - chỉ hiển thị nếu có dữ liệu */}
-                {latestVitals && (
-                  <div className="grid grid-cols-2 gap-2 text-xs">
-                    <div>
-                      <div className="text-neutral-400">Nhịp tim</div>
-                      <div className="text-white font-mono">{latestVitals.heart_rate} bpm</div>
-                    </div>
-                    <div>
-                      <div className="text-neutral-400">Huyết áp</div>
-                      <div className="text-white font-mono">
-                        {latestVitals.blood_pressure_systolic}/{latestVitals.blood_pressure_diastolic}
-                      </div>
-                    </div>
-                    <div>
-                      <div className="text-neutral-400">Nhiệt độ</div>
-                      <div className="text-white font-mono">{latestVitals.temperature}°C</div>
-                    </div>
-                    <div>
-                      <div className="text-neutral-400">SpO2</div>
-                      <div className="text-white font-mono">{latestVitals.spo2}%</div>
-                    </div>
-                  </div>
-                )}
+                {/* Vital Signs section removed */}
 
                 {/* Tủ thuốc */}
                 {patient.medicine_cabinets && patient.medicine_cabinets.length > 0 && (
@@ -614,54 +583,7 @@ export default function PatientsPage() {
                 </div>
 
                 <div className="space-y-4">
-                  {/* Sinh hiệu - chỉ hiển thị nếu có dữ liệu */}
-                  {selectedPatient.health_monitoring && selectedPatient.health_monitoring.length > 0 && (
-                    <div>
-                      <h3 className="text-sm font-medium text-neutral-300 tracking-wider mb-2">SINH HIỆU GẦN NHẤT</h3>
-                      <div className="space-y-3">
-                        {(() => {
-                          const vitals = selectedPatient.health_monitoring[0]
-                          return [
-                            {
-                              label: "Nhịp tim",
-                              value: `${vitals.heart_rate} bpm`,
-                              icon: Heart,
-                              color: "text-red-500",
-                            },
-                            {
-                              label: "Huyết áp",
-                              value: `${vitals.blood_pressure_systolic}/${vitals.blood_pressure_diastolic}`,
-                              icon: Heart,
-                              color: "text-white",
-                            },
-                            {
-                              label: "Nhiệt độ",
-                              value: `${vitals.temperature}°C`,
-                              icon: Heart,
-                              color: "text-orange-500",
-                            },
-                            {
-                              label: "SpO2",
-                              value: `${vitals.spo2}%`,
-                              icon: Heart,
-                              color: "text-blue-500",
-                            },
-                          ].map((vital, index) => (
-                            <div key={index} className="flex items-center justify-between p-2 bg-neutral-800 rounded">
-                              <div className="flex items-center gap-2">
-                                <vital.icon className={`w-4 h-4 ${vital.color}`} />
-                                <span className="text-sm text-neutral-300">{vital.label}</span>
-                              </div>
-                              <span className="text-sm text-white font-mono">{vital.value}</span>
-                            </div>
-                          ))
-                        })()}
-                      </div>
-                      <div className="text-xs text-neutral-500 mt-2">
-                        Cập nhật: {new Date(selectedPatient.health_monitoring[0].recorded_at).toLocaleString("vi-VN")}
-                      </div>
-                    </div>
-                  )}
+                  {/* Health monitoring section removed */}
                 </div>
               </div>
 

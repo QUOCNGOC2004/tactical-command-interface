@@ -37,12 +37,6 @@ const navigation = [
     description: "Quản lý tủ thuốc thông minh",
   },
   {
-    name: "Theo dõi sức khỏe",
-    href: "/health-monitor",
-    icon: Heart,
-    description: "Giám sát sinh hiệu bệnh nhân",
-  },
-  {
     name: "Hệ thống nước",
     href: "/water-system",
     icon: Droplets,

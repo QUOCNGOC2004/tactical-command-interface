@@ -514,3 +514,5 @@ ON CONFLICT DO NOTHING;
 
 ALTER TABLE medication_schedules ADD COLUMN compartment_id UUID REFERENCES compartments(id) ON DELETE SET NULL;
 DELETE FROM cabinet_medications WHERE compartment_id IS NULL;
+-- Drop health monitoring table
+DROP TABLE IF EXISTS health_monitoring;
