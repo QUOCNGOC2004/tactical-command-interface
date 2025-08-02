@@ -38,6 +38,7 @@ interface MedicationSchedule {
   patients: { name: string; room_number: string }
   medications: { name: string; dosage: string }
   medicine_cabinets: { cabinet_code: string }
+  compartments?: { compartment_type: string }
 }
 
 export default function SchedulesPage() {
@@ -142,13 +143,21 @@ export default function SchedulesPage() {
         body: JSON.stringify(schedulePayload),
       })
 
-      if (!res.ok) throw new Error("Lưu lịch trình thất bại")
+      if (!res.ok) {
+        let errorMsg = "Lưu lịch trình thất bại";
+        try {
+          const errorData = await res.json();
+          if (errorData?.error) errorMsg = errorData.error;
+        } catch {}
+        alert(errorMsg);
+        return;
+      }
 
-      await fetchSchedules()
-      resetForm()
+      await fetchSchedules();
+      resetForm();
     } catch (err) {
-      console.error("Error saving schedule:", err)
-      alert("Đã có lỗi xảy ra, vui lòng thử lại!")
+      console.error("Error saving schedule:", err);
+      alert("Đã có lỗi xảy ra, vui lòng thử lại!");
     }
   }
 
@@ -224,14 +233,15 @@ export default function SchedulesPage() {
     }
   }
 
-  const getCompartmentText = (compartment: string) => {
+  const getCompartmentText = (compartment?: string) => {
+    if (!compartment) return "";
     switch (compartment) {
       case "compartment1":
-        return "NGĂN 1"
+        return "NGĂN 1";
       case "compartment2":
-        return "NGĂN 2"
+        return "NGĂN 2";
       default:
-        return compartment.toUpperCase()
+        return compartment?.toUpperCase?.() || "";
     }
   }
 
@@ -375,7 +385,7 @@ export default function SchedulesPage() {
 
                           <div className="flex items-center justify-between text-xs">
                             <div className="text-neutral-400">
-                              Ngăn: <span className="text-white">{getCompartmentText(schedule.compartment)}</span>
+                              Ngăn: <span className="text-white">{getCompartmentText(schedule.compartments?.compartment_type)}</span>
                             </div>
                             <div className="text-neutral-400">
                               Tủ:{" "}
